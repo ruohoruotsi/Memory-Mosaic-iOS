@@ -74,19 +74,24 @@
 		8983531219931BEC00F5D22E /* pkmAudioFeatures.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 898352F819931BEC00F5D22E /* pkmAudioFeatures.cpp */; };
 		8983531319931BEC00F5D22E /* pkmAudioFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 898352FA19931BEC00F5D22E /* pkmAudioFile.cpp */; };
 		8983531419931BEC00F5D22E /* pkmAudioSegment.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 898352FC19931BEC00F5D22E /* pkmAudioSegment.cpp */; };
-		8983531519931BEC00F5D22E /* pkmAudioSegmentDatabase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 898352FE19931BEC00F5D22E /* pkmAudioSegmentDatabase.cpp */; };
+		8983531519931BEC00F5D22E /* pkmAudioSegmentDatabase.mm in Sources */ = {isa = PBXBuildFile; fileRef = 898352FE19931BEC00F5D22E /* pkmAudioSegmentDatabase.mm */; };
 		8983531619931BEC00F5D22E /* pkmAudioSegmenter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983530019931BEC00F5D22E /* pkmAudioSegmenter.cpp */; };
 		8983531719931BEC00F5D22E /* pkmAudioSpectralFlux.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983530219931BEC00F5D22E /* pkmAudioSpectralFlux.cpp */; };
 		8983531819931BEC00F5D22E /* pkmAudioWindow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983530419931BEC00F5D22E /* pkmAudioWindow.cpp */; };
 		8983531919931BEC00F5D22E /* pkmCircularRecorder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983530619931BEC00F5D22E /* pkmCircularRecorder.cpp */; };
 		8983531A19931BEC00F5D22E /* pkmImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983530819931BEC00F5D22E /* pkmImage.cpp */; };
-		8983531B19931BEC00F5D22E /* pkmPLCA.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983530A19931BEC00F5D22E /* pkmPLCA.cpp */; };
 		8983532819931C0300F5D22E /* maximilian.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983531C19931C0300F5D22E /* maximilian.cpp */; };
 		8983532919931C0300F5D22E /* ofxiTunesLibraryStreamViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 8983531E19931C0300F5D22E /* ofxiTunesLibraryStreamViewController.m */; };
 		8983532A19931C0300F5D22E /* ofxiTunesLibraryStream.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8983532019931C0300F5D22E /* ofxiTunesLibraryStream.mm */; };
 		8983532B19931C0300F5D22E /* limiter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983532219931C0300F5D22E /* limiter.cpp */; };
 		8983532C19931C0300F5D22E /* pkmButton.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8983532419931C0300F5D22E /* pkmButton.mm */; };
 		8983532D19931C0300F5D22E /* pkmFonts.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8983532619931C0300F5D22E /* pkmFonts.cpp */; };
+		89A1BB821A6A131C008CDFEC /* freeimage.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 89A1BB801A6A131C008CDFEC /* freeimage.a */; };
+		89A1BB831A6A131C008CDFEC /* freeimage.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 89A1BB811A6A131C008CDFEC /* freeimage.a */; };
+		89A1BB851A6A13A0008CDFEC /* freeimage.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 89A1BB841A6A13A0008CDFEC /* freeimage.a */; };
+		89A1BB8B1A6A2E08008CDFEC /* ofxSmoothLines.mm in Sources */ = {isa = PBXBuildFile; fileRef = 89A1BB891A6A2E08008CDFEC /* ofxSmoothLines.mm */; };
+		89A1BB8F1A6A3AA3008CDFEC /* help.png in Resources */ = {isa = PBXBuildFile; fileRef = 89A1BB8E1A6A3AA3008CDFEC /* help.png */; };
+		89ADED9E1A59BE1400A7765F /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 89ADED9D1A59BE1400A7765F /* Security.framework */; };
 		89C6AF6719A01B0B0054FDDC /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 89C6AF6619A01B0B0054FDDC /* Accelerate.framework */; };
 		89C6AF6919A01B200054FDDC /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 89C6AF6819A01B200054FDDC /* MediaPlayer.framework */; };
 		BB16EBD20F2B2A9500518274 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB16EBD10F2B2A9500518274 /* OpenGLES.framework */; };
@@ -202,7 +207,7 @@
 		898352FB19931BEC00F5D22E /* pkmAudioFile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmAudioFile.h; path = ../../../../../pkm/pkmAudio/pkmAudioFile.h; sourceTree = "<group>"; };
 		898352FC19931BEC00F5D22E /* pkmAudioSegment.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pkmAudioSegment.cpp; path = ../../../../../pkm/pkmAudio/pkmAudioSegment.cpp; sourceTree = "<group>"; };
 		898352FD19931BEC00F5D22E /* pkmAudioSegment.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmAudioSegment.h; path = ../../../../../pkm/pkmAudio/pkmAudioSegment.h; sourceTree = "<group>"; };
-		898352FE19931BEC00F5D22E /* pkmAudioSegmentDatabase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pkmAudioSegmentDatabase.cpp; path = ../../../../../pkm/pkmAudio/pkmAudioSegmentDatabase.cpp; sourceTree = "<group>"; };
+		898352FE19931BEC00F5D22E /* pkmAudioSegmentDatabase.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = pkmAudioSegmentDatabase.mm; path = ../../../../../pkm/pkmAudio/pkmAudioSegmentDatabase.mm; sourceTree = "<group>"; };
 		898352FF19931BEC00F5D22E /* pkmAudioSegmentDatabase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmAudioSegmentDatabase.h; path = ../../../../../pkm/pkmAudio/pkmAudioSegmentDatabase.h; sourceTree = "<group>"; };
 		8983530019931BEC00F5D22E /* pkmAudioSegmenter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pkmAudioSegmenter.cpp; path = ../../../../../pkm/pkmAudio/pkmAudioSegmenter.cpp; sourceTree = "<group>"; };
 		8983530119931BEC00F5D22E /* pkmAudioSegmenter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmAudioSegmenter.h; path = ../../../../../pkm/pkmAudio/pkmAudioSegmenter.h; sourceTree = "<group>"; };
@@ -214,8 +219,6 @@
 		8983530719931BEC00F5D22E /* pkmCircularRecorder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmCircularRecorder.h; path = ../../../../../pkm/pkmRecorder/pkmCircularRecorder.h; sourceTree = "<group>"; };
 		8983530819931BEC00F5D22E /* pkmImage.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pkmImage.cpp; path = ../../../../../pkm/pkmMatrix/pkmImage.cpp; sourceTree = "<group>"; };
 		8983530919931BEC00F5D22E /* pkmImage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmImage.h; path = ../../../../../pkm/pkmMatrix/pkmImage.h; sourceTree = "<group>"; };
-		8983530A19931BEC00F5D22E /* pkmPLCA.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pkmPLCA.cpp; path = ../../../../../pkm/pkmPLCA/pkmPLCA.cpp; sourceTree = "<group>"; };
-		8983530B19931BEC00F5D22E /* pkmPLCA.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmPLCA.h; path = ../../../../../pkm/pkmPLCA/pkmPLCA.h; sourceTree = "<group>"; };
 		8983531C19931C0300F5D22E /* maximilian.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = maximilian.cpp; path = ../../../../../of080ios/apps/myApps/memoryMosaic/src/maximilian.cpp; sourceTree = "<group>"; };
 		8983531D19931C0300F5D22E /* maximilian.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = maximilian.h; path = ../../../../../of080ios/apps/myApps/memoryMosaic/src/maximilian.h; sourceTree = "<group>"; };
 		8983531E19931C0300F5D22E /* ofxiTunesLibraryStreamViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ofxiTunesLibraryStreamViewController.m; path = ../../../../../pkm/pkmiTunesLibraryStream/ofxiTunesLibraryStreamViewController.m; sourceTree = "<group>"; };
@@ -228,6 +231,13 @@
 		8983532519931C0300F5D22E /* pkmButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmButton.h; path = ../../../../../of080ios/apps/myApps/memoryMosaic/src/pkmButton.h; sourceTree = "<group>"; };
 		8983532619931C0300F5D22E /* pkmFonts.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = pkmFonts.cpp; path = ../../../../../of080ios/apps/myApps/memoryMosaic/src/pkmFonts.cpp; sourceTree = "<group>"; };
 		8983532719931C0300F5D22E /* pkmFonts.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pkmFonts.h; path = ../../../../../of080ios/apps/myApps/memoryMosaic/src/pkmFonts.h; sourceTree = "<group>"; };
+		89A1BB801A6A131C008CDFEC /* freeimage.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = freeimage.a; path = ../../../libs/FreeImage/lib/ios/freeimage.a; sourceTree = "<group>"; };
+		89A1BB811A6A131C008CDFEC /* freeimage.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = freeimage.a; path = ../../../libs/FreeImage/lib/osx/freeimage.a; sourceTree = "<group>"; };
+		89A1BB841A6A13A0008CDFEC /* freeimage.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = freeimage.a; path = ../../../libs/FreeImage/lib/osx/i386/freeimage.a; sourceTree = "<group>"; };
+		89A1BB891A6A2E08008CDFEC /* ofxSmoothLines.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ofxSmoothLines.mm; sourceTree = "<group>"; };
+		89A1BB8A1A6A2E08008CDFEC /* ofxSmoothLines.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ofxSmoothLines.h; sourceTree = "<group>"; };
+		89A1BB8E1A6A3AA3008CDFEC /* help.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = help.png; path = bin/data/help.png; sourceTree = "<group>"; };
+		89ADED9D1A59BE1400A7765F /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		89C6AF6619A01B0B0054FDDC /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		89C6AF6819A01B200054FDDC /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
 		BB16EBD10F2B2A9500518274 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
@@ -251,18 +261,22 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BB16EBD20F2B2A9500518274 /* OpenGLES.framework in Frameworks */,
+				BB16EBD90F2B2AB500518274 /* QuartzCore.framework in Frameworks */,
+				89ADED9E1A59BE1400A7765F /* Security.framework in Frameworks */,
 				894CEF3719A47AB000D72D2E /* AudioToolbox.framework in Frameworks */,
 				89C6AF6919A01B200054FDDC /* MediaPlayer.framework in Frameworks */,
 				89C6AF6719A01B0B0054FDDC /* Accelerate.framework in Frameworks */,
 				E41D421413B3A95300A75A5D /* libofxiOS_iphoneos_Debug.a in Frameworks */,
 				1D60589F0D05DD5A006BFB54 /* Foundation.framework in Frameworks */,
 				1DF5F4E00D08C38300B7A737 /* UIKit.framework in Frameworks */,
+				89A1BB821A6A131C008CDFEC /* freeimage.a in Frameworks */,
+				89A1BB831A6A131C008CDFEC /* freeimage.a in Frameworks */,
 				288765FD0DF74451002DB57D /* CoreGraphics.framework in Frameworks */,
-				BB16EBD20F2B2A9500518274 /* OpenGLES.framework in Frameworks */,
-				BB16EBD90F2B2AB500518274 /* QuartzCore.framework in Frameworks */,
 				53F323EB10A20EDB00E0DAE4 /* OpenAL.framework in Frameworks */,
 				5326AEA810A23A0500278DE6 /* CoreLocation.framework in Frameworks */,
 				E4A823A412561BE3002F86A2 /* CoreGraphics.framework in Frameworks */,
+				89A1BB851A6A13A0008CDFEC /* freeimage.a in Frameworks */,
 				E41D400B13B39D2100A75A5D /* AVFoundation.framework in Frameworks */,
 				E41D400C13B39D2100A75A5D /* CoreMedia.framework in Frameworks */,
 				E41D400D13B39D2100A75A5D /* CoreVideo.framework in Frameworks */,
@@ -284,6 +298,10 @@
 		29B97314FDCFA39411CA2CEA /* CustomTemplate */ = {
 			isa = PBXGroup;
 			children = (
+				89A1BB8E1A6A3AA3008CDFEC /* help.png */,
+				89A1BB801A6A131C008CDFEC /* freeimage.a */,
+				89A1BB811A6A131C008CDFEC /* freeimage.a */,
+				89A1BB841A6A13A0008CDFEC /* freeimage.a */,
 				894CEF6E19A47C6E00D72D2E /* Icon-Small.png */,
 				894CEF6F19A47C6E00D72D2E /* Icon-Small@2x.png */,
 				894CEF7019A47C6E00D72D2E /* icon.png */,
@@ -314,7 +332,6 @@
 				894CEF5019A47B4C00D72D2E /* icon-152.png */,
 				894CEF5119A47B4C00D72D2E /* icon-512x512.png */,
 				894CEF5219A47B4C00D72D2E /* icon-1024x1024.png */,
-				894CEF3619A47AB000D72D2E /* AudioToolbox.framework */,
 				894CEF3019A444FA00D72D2E /* aller-light.ttf */,
 				894CEF2E19A4325B00D72D2E /* info.png */,
 				894CEF2A19A42AE200D72D2E /* speckles.png */,
@@ -339,8 +356,6 @@
 				897B323B19A0243B004B3989 /* DekarLight.ttf */,
 				897B323C19A0243B004B3989 /* verdana.ttf */,
 				897B323D19A0243B004B3989 /* hoefler.ttc */,
-				89C6AF6819A01B200054FDDC /* MediaPlayer.framework */,
-				89C6AF6619A01B0B0054FDDC /* Accelerate.framework */,
 				E4D8936A11527B74007E1F53 /* src */,
 				BB24E1F710DAA51900E9C588 /* openFrameworks */,
 				BB16F26B0F2B646B00518274 /* addons */,
@@ -353,6 +368,10 @@
 		29B97323FDCFA39411CA2CEA /* core frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				89ADED9D1A59BE1400A7765F /* Security.framework */,
+				894CEF3619A47AB000D72D2E /* AudioToolbox.framework */,
+				89C6AF6819A01B200054FDDC /* MediaPlayer.framework */,
+				89C6AF6619A01B0B0054FDDC /* Accelerate.framework */,
 				E41D400613B39D2100A75A5D /* AVFoundation.framework */,
 				E41D400713B39D2100A75A5D /* CoreMedia.framework */,
 				E41D400813B39D2100A75A5D /* CoreVideo.framework */,
@@ -446,7 +465,7 @@
 				898352FB19931BEC00F5D22E /* pkmAudioFile.h */,
 				898352FC19931BEC00F5D22E /* pkmAudioSegment.cpp */,
 				898352FD19931BEC00F5D22E /* pkmAudioSegment.h */,
-				898352FE19931BEC00F5D22E /* pkmAudioSegmentDatabase.cpp */,
+				898352FE19931BEC00F5D22E /* pkmAudioSegmentDatabase.mm */,
 				898352FF19931BEC00F5D22E /* pkmAudioSegmentDatabase.h */,
 				8983530019931BEC00F5D22E /* pkmAudioSegmenter.cpp */,
 				8983530119931BEC00F5D22E /* pkmAudioSegmenter.h */,
@@ -458,11 +477,11 @@
 				8983530719931BEC00F5D22E /* pkmCircularRecorder.h */,
 				8983530819931BEC00F5D22E /* pkmImage.cpp */,
 				8983530919931BEC00F5D22E /* pkmImage.h */,
-				8983530A19931BEC00F5D22E /* pkmPLCA.cpp */,
-				8983530B19931BEC00F5D22E /* pkmPLCA.h */,
 				E4D8936B11527B74007E1F53 /* main.mm */,
 				E4D8936D11527B74007E1F53 /* ofApp.mm */,
 				E4D8936C11527B74007E1F53 /* ofApp.h */,
+				89A1BB891A6A2E08008CDFEC /* ofxSmoothLines.mm */,
+				89A1BB8A1A6A2E08008CDFEC /* ofxSmoothLines.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -504,7 +523,7 @@
 								enabled = 1;
 							};
 							com.apple.InterAppAudio = {
-								enabled = 0;
+								enabled = 1;
 							};
 							com.apple.iOS = {
 								enabled = 0;
@@ -584,6 +603,7 @@
 				894CEF6119A47B4C00D72D2E /* Icon-60.png in Resources */,
 				894CEF6C19A47B4C00D72D2E /* icon-512x512.png in Resources */,
 				894CEF5C19A47B4C00D72D2E /* Icon-40.png in Resources */,
+				89A1BB8F1A6A3AA3008CDFEC /* help.png in Resources */,
 				897B323F19A0243B004B3989 /* Default.png in Resources */,
 				894CEF1F19A1E75B00D72D2E /* Icon-40@2x.png in Resources */,
 				894CEF1E19A1E75B00D72D2E /* Icon-40.png in Resources */,
@@ -637,16 +657,16 @@
 				8983531819931BEC00F5D22E /* pkmAudioWindow.cpp in Sources */,
 				8983530F19931BEC00F5D22E /* pkmFFT.cpp in Sources */,
 				8983531619931BEC00F5D22E /* pkmAudioSegmenter.cpp in Sources */,
-				8983531B19931BEC00F5D22E /* pkmPLCA.cpp in Sources */,
 				E4D8936E11527B74007E1F53 /* main.mm in Sources */,
 				8983532A19931C0300F5D22E /* ofxiTunesLibraryStream.mm in Sources */,
 				8983530E19931BEC00F5D22E /* pkmMatrix.cpp in Sources */,
 				8983532819931C0300F5D22E /* maximilian.cpp in Sources */,
 				8983531219931BEC00F5D22E /* pkmAudioFeatures.cpp in Sources */,
 				8983531419931BEC00F5D22E /* pkmAudioSegment.cpp in Sources */,
-				8983531519931BEC00F5D22E /* pkmAudioSegmentDatabase.cpp in Sources */,
+				8983531519931BEC00F5D22E /* pkmAudioSegmentDatabase.mm in Sources */,
 				8983532C19931C0300F5D22E /* pkmButton.mm in Sources */,
 				8983531319931BEC00F5D22E /* pkmAudioFile.cpp in Sources */,
+				89A1BB8B1A6A2E08008CDFEC /* ofxSmoothLines.mm in Sources */,
 				E4D8936F11527B74007E1F53 /* ofApp.mm in Sources */,
 				8983532D19931C0300F5D22E /* pkmFonts.cpp in Sources */,
 				8983531919931BEC00F5D22E /* pkmCircularRecorder.cpp in Sources */,
@@ -675,7 +695,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				CODE_SIGN_ENTITLEMENTS = memorymosaic.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
@@ -685,12 +707,18 @@
 					"$(OF_CORE_HEADERS)",
 					src,
 					/Users/pkmital/pkm/dev/flann/build/include,
+					Audiobus,
+					"/Users/pkmital/pkm/dev/of-git/apps/myApps/memory_mosaic_1.6_in_progress/Audiobus",
 				);
 				INFOPLIST_FILE = "ofxiOS-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 4.3;
+				IPHONEOS_DEPLOYMENT_TARGET = 5.1.1;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					/Users/pkmital/pkm/dev/flann/build/lib,
+					"$(PROJECT_DIR)",
+					"/Users/pkmital/pkm/dev/of-git/libs/FreeImage/lib/ios",
+					"/Users/pkmital/pkm/dev/of-git/libs/FreeImage/lib/osx",
+					"/Users/pkmital/pkm/dev/of-git/libs/FreeImage/lib/osx/i386",
 				);
 				OTHER_LDFLAGS = (
 					"$(OF_CORE_LIBS)",
@@ -700,14 +728,16 @@
 				PRODUCT_NAME = memorymosaic;
 				PROVISIONING_PROFILE = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
-				VALID_ARCHS = "armv6 armv7";
+				VALID_ARCHS = armv7;
 			};
 			name = Debug;
 		};
 		1D6058950D05DD3E006BFB54 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD)";
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				CODE_SIGN_ENTITLEMENTS = memorymosaic.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
@@ -717,12 +747,18 @@
 					"$(OF_CORE_HEADERS)",
 					src,
 					/Users/pkmital/pkm/dev/flann/build/include,
+					Audiobus,
+					"/Users/pkmital/pkm/dev/of-git/apps/myApps/memory_mosaic_1.6_in_progress/Audiobus",
 				);
 				INFOPLIST_FILE = "ofxiOS-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 4.3;
+				IPHONEOS_DEPLOYMENT_TARGET = 5.1.1;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					/Users/pkmital/pkm/dev/flann/build/lib,
+					"$(PROJECT_DIR)",
+					"/Users/pkmital/pkm/dev/of-git/libs/FreeImage/lib/ios",
+					"/Users/pkmital/pkm/dev/of-git/libs/FreeImage/lib/osx",
+					"/Users/pkmital/pkm/dev/of-git/libs/FreeImage/lib/osx/i386",
 				);
 				OTHER_LDFLAGS = (
 					"$(OF_CORE_LIBS)",
@@ -732,7 +768,7 @@
 				PRODUCT_NAME = memorymosaic;
 				PROVISIONING_PROFILE = "";
 				TARGETED_DEVICE_FAMILY = "1,2";
-				VALID_ARCHS = "armv6 armv7";
+				VALID_ARCHS = armv7;
 			};
 			name = Release;
 		};

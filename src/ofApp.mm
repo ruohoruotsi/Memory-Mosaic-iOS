@@ -80,6 +80,12 @@
  * try different features such as pitch, loudness, and spectral flux
  * UI feedback for touchdown events, only act on up
  
+ * Create paths from touch and loop them... have multiple loops concurrent... 
+ 
+ * Speed/warping based on velocity/movement of touch
+ * Show grid over selected sound fragment, x/y dimensions changing pitch/time stretch... 
+ * Pan/Zoom over segments to get better control
+ 
  *
  */
 
@@ -105,7 +111,7 @@ bool checkbox1 = true;
 int slider0_x = 60;
 int slider0_y = 105;
 int slider1_x = 60;
-int slider1_y = 1045;
+int slider1_y = 145;
 int slider2_x = 60;
 int slider2_y = 185;
 
@@ -122,6 +128,7 @@ const float MAX_GRAIN_LENGTH = 5.0;
 
 int SCREEN_WIDTH = 320;
 int SCREEN_HEIGHT = 480;
+float scale_factor = 1.0f;
 
 float height_ratio = 1.0;
 
@@ -167,7 +174,6 @@ app::~app()
 	audioOutputFileWriter.close();
 	audioInputFileWriter.close();
 #endif
-	audioFileWriter.close();
     songReader.close();
 #ifdef TARGET_OF_IPHONE
     fclose(fp);
@@ -179,7 +185,7 @@ app::~app()
 	free(current_frame);
     free(itunes_frame);
 #ifndef DO_FILEINPUT
-    audioDatabaseNormalizer->saveNormalization();
+    audio_database_normalizer->saveNormalization();
 #endif
     
 }
@@ -187,9 +193,28 @@ app::~app()
 //--------------------------------------------------------------
 void app::setup()
 {
-    SCREEN_WIDTH = ofGetHeight();
-    SCREEN_HEIGHT = ofGetWidth();
+    ofSetOrientation(OF_ORIENTATION_90_RIGHT);
     
+    
+//    ofxiOSGetOFWindow()->disableOrientationAnimation();
+//    ofxiOSGetOFWindow()->disableHardwareOrientation();
+    ofxiOSGetOFWindow()->enableAntiAliasing(8);
+    ofxiOSGetOFWindow()->enableRetina();
+    ofxiOSGetOFWindow()->enableOrientationAnimation();
+    
+    if(ofxiOSGetOFWindow()->isRetinaEnabled())
+        scale_factor = 2.0;
+    
+    SCREEN_WIDTH = ofGetWidth();
+    SCREEN_HEIGHT = ofGetHeight();
+    
+    if(SCREEN_WIDTH < SCREEN_HEIGHT)
+        std::swap(SCREEN_WIDTH, SCREEN_HEIGHT);
+    
+    ofSetCircleResolution(30);
+    
+//    ofSetWindowShape(SCREEN_WIDTH, SCREEN_HEIGHT);
+
     height_ratio = SCREEN_HEIGHT / (320.0f);
     
     slider0_x = SCREEN_WIDTH * 0.1;         slider0_y *= height_ratio;
@@ -204,7 +229,7 @@ void app::setup()
     
     cout << "w: " << SCREEN_WIDTH << " h: " << SCREEN_HEIGHT << endl;
     
-	ofSetOrientation(OF_ORIENTATION_90_RIGHT);
+//	ofSetOrientation(OF_ORIENTATION_90_RIGHT);
     
     bDrawNeedsUpdate = true;
     bOutOfMemory = false;
@@ -220,23 +245,23 @@ void app::setup()
     bWaitingForUserToPickSong = bConvertingSong = bLoadedSong = false;
     bDetectedOnset = false;
     bInteractiveMode = false;
-    bDrawHelp = 1;
+    bDrawOptions = true;
+    bDrawHelp = 0;
     
     sampleRate = 44100;
-    frameSize = 512;
+    frame_size = 512;
     fftSize = 8192;
     frame = 0;
     currentFile = 0;
-    inputSegmentsCounter = 0;
     
     bMovingSlider0 = bMovingSlider1 = bMovingSlider2 = false;
     
-    buttonScreenSliders.loadImage("speckles.png");
-    buttonScreenInteraction.loadImage("sliders.png");
-    buttonInfo.loadImage("info.png");
+    buttonScreenInteraction.loadImage("speckles.png");
+    buttonMenuSliders.loadImage("sliders.png");
+    buttonInfo.loadImage("help.png");
     
     // setup envelopes
-    pkmAudioWindow::initializeWindow(frameSize);
+    pkmAudioWindow::initializeWindow(frame_size);
     
 #ifdef TARGET_OF_IPHONE
     documentsDirectory = ofxiPhoneGetDocumentsDirectory();
@@ -268,78 +293,70 @@ void app::setup()
 	fp = freopen([logPath cStringUsingEncoding:NSASCIIStringEncoding],"a+",stderr);
 	
 	// initialize picker for itunes library
-	itunesStream.allocate(sampleRate, frameSize, 1);
+	itunes_stream.allocate(sampleRate, frame_size, 1);
 	
 	
 	// register touch events
 	//ofRegisterTouchEvents(this);
 	
 	// iPhoneAlerts will be sent to this.
-	ofxiPhoneAlerts.addListener(this);
+	// ofxiPhoneAlerts.addListener(this);
 	
-    myFBO.allocate(SCREEN_WIDTH, SCREEN_HEIGHT);
+    fbo.allocate(SCREEN_WIDTH, SCREEN_HEIGHT, GL_RGBA);
+    fbo2.allocate(SCREEN_WIDTH, SCREEN_HEIGHT, GL_RGBA);
+    fbo3.allocate(SCREEN_WIDTH, SCREEN_HEIGHT, GL_RGBA);
 #else
 	ofSetWindowShape(480, 320);
-    myFBO.allocate(480, 320);
+    fbo.allocate(480, 320);
 	ofSetFullscreen(false);
 #endif
-    
-    ofxiOSGetOFWindow()->disableOrientationAnimation();
-    ofxiOSGetOFWindow()->disableHardwareOrientation();
-	ofxiOSGetOFWindow()->enableAntiAliasing(8);
-    ofxiOSGetOFWindow()->enableRetina();
     
 	// black
 	ofBackground(0,0,0);
     ofSetFrameRate(30);
-	
-    smallBoldFont.loadFont("Dekar.ttf", 18, true);
-    largeBoldFont.loadFont("Dekar.ttf", 36, true);
-//    largeThinFont.loadFont("DekarLight.ttf", 36, true);
-//    smallThinFont.loadFont("DekarLight.ttf", 16, true);
-//    infoFont.loadFont("aller-light.ttf", 12, true, false);
-    infoFont.loadFont("DekarLight.ttf", 14, true, false);
+	//, bool _bFullCharacterSet, bool _makeContours, float _simplifyAmt, int _dpi
+    small_bold_font.loadFont("Dekar.ttf", 15, true, false, true, 0.0);
+    large_bold_font.loadFont("Dekar.ttf", 36, true, false, true, 0.0);
+    info_font.loadFont("DekarLight.ttf", 14, true, false, true, 0.0);
 	
     background.loadImage("bg.png");
     
     button.loadImage("button.png");
     
-    ringBuffer = new pkmCircularRecorder(fftSize, frameSize);
-    alignedFrame = (float *)malloc(sizeof(float) * fftSize);
+    ring_buffer = new pkmCircularRecorder(fftSize, frame_size);
+    aligned_frame = (float *)malloc(sizeof(float) * fftSize);
     
-    zeroFrame = (float *)malloc(sizeof(float) * frameSize);
-    memset(zeroFrame, 0, sizeof(float) * frameSize);
+    zeroFrame = (float *)malloc(sizeof(float) * frame_size);
+    memset(zeroFrame, 0, sizeof(float) * frame_size);
     
-    current_frame = (float *)malloc(sizeof(float) * frameSize);
-    itunes_frame = (float *)malloc(sizeof(float) * frameSize);
-    buffer = (float *)malloc(sizeof(float) * frameSize);
-    output = (float *)malloc(sizeof(float) * frameSize);
-    output_mono = (float *)malloc(sizeof(float) * frameSize);
+    current_frame = (float *)malloc(sizeof(float) * frame_size);
+    itunes_frame = (float *)malloc(sizeof(float) * frame_size);
+    buffer = (float *)malloc(sizeof(float) * frame_size);
+    output = (float *)malloc(sizeof(float) * frame_size);
+    output_mono = (float *)malloc(sizeof(float) * frame_size);
 	
 	// does onset detection for matching
     slider1_position = 0.05;
-    spectralFlux = new pkmAudioSpectralFlux(frameSize, fftSize, sampleRate);
-    spectralFlux->setOnsetThreshold(0.25);
-    spectralFlux->setIIRAlpha(0.01);
-	spectralFlux->setMinSegmentLength(MAX_GRAIN_LENGTH * sampleRate / frameSize * slider1_position);
+    spectral_flux = new pkmAudioSpectralFlux(frame_size, fftSize, sampleRate);
+    spectral_flux->setOnsetThreshold(0.25);
+    spectral_flux->setIIRAlpha(0.01);
+	spectral_flux->setMinSegmentLength(MAX_GRAIN_LENGTH * sampleRate / frame_size * slider1_position);
     
-	audioDatabase = new pkmAudioSegmentDatabase();
+	audio_database = new pkmAudioSegmentDatabase();
     int k = 3;
-	audioDatabase->setK(k);
-    audioDatabase->setMaxObjects(500);
+	audio_database->setK(k);
+    audio_database->setMaxObjects(500);
 	slider2_position = (k - 1)/(maxVoices - 1);
 	
-    audioFeature = new pkmAudioFeatures(sampleRate, fftSize);
+    audio_feature = new pkmAudioFeatures(sampleRate, fftSize);
 //    dct.setup(fftSize);
     
     numFeatures = 24;
-    featureFrame = pkm::Mat(1, numFeatures);
-    
-    audioDatabaseNormalizer = new pkmAudioFeatureNormalizer(numFeatures);
-    currentNumFeatures = 0;
+    audio_database_normalizer = new pkmAudioFeatureNormalizer(numFeatures);
+    current_num_features = 0;
     
 #ifndef DO_FILEINPUT
-    audioDatabaseNormalizer->loadNormalization();
+    audio_database_normalizer->loadNormalization();
 #endif
     
 #ifdef DO_PLCA_SEPARATION
@@ -357,18 +374,16 @@ void app::setup()
 #endif
     
     foreground_features  = (float *)malloc(sizeof(float)*numFeatures);
-    currentSegment = pkm::Mat(SAMPLE_RATE / frameSize * 5, frameSize, true);
-    currentSegmentFeatures = pkm::Mat(SAMPLE_RATE / frameSize * 5, numFeatures, true);
+    current_segment = pkm::Mat(SAMPLE_RATE / frame_size * 5, frame_size, true);
+    current_segment_features = pkm::Mat(SAMPLE_RATE / frame_size * 5, numFeatures, true);
     
-    currentITunesSegment = pkm::Mat(SAMPLE_RATE / frameSize * 5, frameSize, true);
-    currentITunesSegmentFeatures = pkm::Mat(SAMPLE_RATE / frameSize * 5, numFeatures, true);
+    current_itunes_segment = pkm::Mat(SAMPLE_RATE / frame_size * 5, frame_size, true);
+    current_itunes_segment_features = pkm::Mat(SAMPLE_RATE / frame_size * 5, numFeatures, true);
     
 	animationCounter = 0;
     segmentationCounter = segmentationtime;
 	
-    maxiSettings::setup(sampleRate, 1, frameSize);
-    inputFollower.setAttack(20);
-    inputFollower.setRelease(800);
+    maxiSettings::setup(sampleRate, 1, frame_size);
     
     ifstream f;
 	f.open(ofToDataPath("audio_database.mat").c_str());
@@ -395,13 +410,13 @@ void app::setup()
 	<< "_" << ofGetHours() << "_" << ofGetMinutes() << "_" << ofGetSeconds() << ".wav";
 	strFilename = str.str();
 	output_frame = 0;
-	audioOutputFileWriter.open(strFilename, frameSize);
+	audioOutputFileWriter.open(strFilename, frame_size);
 	
 	// setup input
 	str2 << strDocumentsDirectory << "/" << "input_" << ofGetDay() << ofGetMonth() << ofGetYear()
 	<< "_" << ofGetHours() << "_" << ofGetMinutes() << "_" << ofGetSeconds() << ".wav";
 	strFilename = str2.str();
-	audioInputFileWriter.open(strFilename, frameSize);
+	audioInputFileWriter.open(strFilename, frame_size);
 #endif
     
 //    setupMatching();
@@ -410,13 +425,23 @@ void app::setup()
 	ofEnableAlphaBlending();
 	ofSetBackgroundAuto(false);
     ofBackground(0);
+
     
 #ifdef DO_FILEINPUT
     
 #else
     bLearningInputForNormalization = true;
     //	ofSetFrameRate(25);
-	ofSoundStreamSetup(2, 1, this, sampleRate, frameSize, 1);
+	ofSoundStreamSetup(2, 1, this, sampleRate, frame_size, 1);
+    
+    NSString *category = AVAudioSessionCategoryPlayAndRecord;
+    AVAudioSessionCategoryOptions options = AVAudioSessionCategoryOptionMixWithOthers | AVAudioSessionCategoryOptionDefaultToSpeakerr;
+    NSError *averror = nil;
+    if ( ![[AVAudioSession sharedInstance] setCategory:category withOptions:options error:&averror] ) {
+        NSLog(@"Couldn't set audio session category: %@", averror);
+    }
+    
+
 #endif
     
     bSetup = true;
@@ -448,16 +473,16 @@ void app::setupBuilding()
         bLearnedPLCABackground = false;
         songReader.open(it->getAbsolutePath());
         long frame = 0;
-        while(frame * frameSize < songReader.mNumSamples && !bOutOfMemory)
+        while(frame * frame_size < songReader.mNumSamples && !bOutOfMemory)
         {
-            if(songReader.read(current_frame, frame*frameSize, frameSize))
+            if(songReader.read(current_frame, frame*frame_size, frame_size))
             {
                 // get audio features
-//                audioFeature->compute36DimAudioFeaturesF(current_frame, foreground_features);
-                audioFeature->computeLFCCF(current_frame, foreground_features, numFeatures);
+//                audio_feature->compute36DimAudioFeaturesF(current_frame, foreground_features);
+                audio_feature->computeLFCCF(current_frame, foreground_features, numFeatures);
                 
                 // check for onset
-                bDetectedOnset = spectralFlux->detectOnset(audioFeature->getMagnitudes(), audioFeature->getMagnitudesLength());
+                bDetectedOnset = spectral_flux->detectOnset(audio_feature->getMagnitudes(), audio_feature->getMagnitudesLength());
                 
                 // do mosaicing
                 processInputFrame();
@@ -472,21 +497,21 @@ void app::setupBuilding()
         
         /*
          // end of file, let's normalize the features
-         currentNumFeatures = audioDatabase->featureDatabase.rows;
-         if (currentNumFeatures > lastNumFeatures) {
-         pkm::Mat thisDatabase = audioDatabase->featureDatabase.rowRange(lastNumFeatures, currentNumFeatures, false);
+         current_num_features = audio_database->featureDatabase.rows;
+         if (current_num_features > lastNumFeatures) {
+         pkm::Mat thisDatabase = audio_database->featureDatabase.rowRange(lastNumFeatures, current_num_features, false);
          printf("Normalizing database of features for %s: \n", it->getFileName().c_str());
          thisDatabase.print();
          pkmAudioFeatureNormalizer::normalizeDatabase(thisDatabase);
          }
-         lastNumFeatures = currentNumFeatures;
+         lastNumFeatures = current_num_features;
          */
     }
     
-    //pkmAudioFeatureNormalizer::normalizeDatabase(audioDatabase->featureDatabase);
-    //audioDatabase->buildIndex();
-    //audioDatabase->save();
-    //audioDatabase->saveIndex();
+    //pkmAudioFeatureNormalizer::normalizeDatabase(audio_database->featureDatabase);
+    //audio_database->buildIndex();
+    //audio_database->save();
+    //audio_database->saveIndex();
 }
 
 void app::setupMatching()
@@ -522,18 +547,18 @@ void app::setupMatching()
     /*
      // calculate normalization of target
      
-     while(inputAudioFileFrame*frameSize < inputAudioFileReader.mNumSamples)
+     while(inputAudioFileFrame*frame_size < inputAudioFileReader.mNumSamples)
      {
      //printf("inputAudioFileFrame: %ld\n", inputAudioFileFrame);
-     inputAudioFileReader.read(current_frame, inputAudioFileFrame*frameSize, frameSize);
+     inputAudioFileReader.read(current_frame, inputAudioFileFrame*frame_size, frame_size);
      inputAudioFileFrame++;
-     //ringBuffer->insertFrame(current_frame);
-     //if (ringBuffer->bRecorded) {
-     //ringBuffer->copyAlignedData(alignedFrame);
+     //ring_buffer->insertFrame(current_frame);
+     //if (ring_buffer->bRecorded) {
+     //ring_buffer->copyAlignedData(aligned_frame);
      #ifdef DO_MEAN_MEL_FEATURE
-     audioFeature->computeLFCCF(current_frame, foreground_features, numFeatures);
+     audio_feature->computeLFCCF(current_frame, foreground_features, numFeatures);
      #else
-     audioFeature->computeLFCCF(current_frame, foreground_features, numFeatures);
+     audio_feature->computeLFCCF(current_frame, foreground_features, numFeatures);
      #endif
      
      bool isFeatureNan = false;
@@ -543,20 +568,19 @@ void app::setupMatching()
      
      if (!isFeatureNan) {
      //printf(".");
-     audioDatabaseNormalizer->addExample(foreground_features, numFeatures);
+     audio_database_normalizer->addExample(foreground_features, numFeatures);
      }
      //}
      }
-     audioDatabaseNormalizer->calculateNormalization();
+     audio_database_normalizer->calculateNormalization();
      */
     
-    audioOutput = pkm::Mat(inputAudioFileFrame, frameSize);
     
     inputAudioFileFrame = 0;
 #endif
     
-    //audioDatabase->load();
-    //audioDatabase->loadIndex();
+    //audio_database->load();
+    //audio_database->loadIndex();
 }
 
 //--------------------------------------------------------------
@@ -564,48 +588,36 @@ void app::update()
 {
 #ifdef DO_FILEINPUT
     
-    while(inputAudioFileFrame*frameSize < inputAudioFileReader.mNumSamples)
+    while(inputAudioFileFrame*frame_size < inputAudioFileReader.mNumSamples)
     {
-        inputAudioFileReader.read(current_frame, inputAudioFileFrame*frameSize, frameSize);
+        inputAudioFileReader.read(current_frame, inputAudioFileFrame*frame_size, frame_size);
         
         if (bLearning) {
-            processInputFrame(current_frame, frameSize);
+            processInputFrame(current_frame, frame_size);
         }
         
-        audioRequested(current_frame, frameSize, 1);
+        audioRequested(current_frame, frame_size, 1);
         
         inputAudioFileFrame++;
     }
     
-    /*
-     // compress result
-     for (long i = 0; i < inputAudioFileFrame; i++) {
-     for (int j = 0; j < frameSize; j++) {
-     audioOutput.data[i*frameSize + j] = compressor.compressor(audioOutput.data[i*frameSize + j], 0.5);
-     }
-     // and save
-     #ifdef DO_RECORD
-     audioOutputFileWriter.write(audioOutput.row(i), i*frameSize, frameSize);
-     #endif
-     }
-     */
     
     printf("[OK] Finished processing file.  Exiting.\n");
     OF_EXIT_APP(0);
 #endif
     
 #ifdef TARGET_OF_IPHONE
-    if (bWaitingForUserToPickSong && itunesStream.isSelected())
+    if (bWaitingForUserToPickSong && itunes_stream.isSelected())
     {
         bWaitingForUserToPickSong = false;
         bProcessingSong = false;
         bConvertingSong = true;
-        itunesStream.setStreaming();
+        itunes_stream.setStreaming();
         printf("[OK]\n");
         bDrawNeedsUpdate = true;
         printf("Loaded user selected song!\n");
     }
-    else if(bWaitingForUserToPickSong && itunesStream.didCancel())
+    else if(bWaitingForUserToPickSong && itunes_stream.didCancel())
     {
         bWaitingForUserToPickSong = false;
         printf("[OK]\n");
@@ -613,16 +625,15 @@ void app::update()
         printf("User canceled!\n");
         
     }
-    else if(bConvertingSong && itunesStream.isPrepared())
+    else if(bConvertingSong && itunes_stream.isPrepared())
     {
         bConvertingSong = false;
-        itunesFrame = 1;
         bProcessingSong = true;
         bDrawNeedsUpdate = true;
     }
 #endif
     
-    //cout << "size: " << audioDatabase->getSize() << endl;
+    //cout << "size: " << audio_database->getSize() << endl;
 }
 
 // scrub memory using a cataRT display
@@ -632,12 +643,12 @@ void app::drawInfo()
 {
     
     ofSetColor(255, 255, 255, (float)(animationtime-animationCounter)/(animationtime/2.0f)*255.0f);
-    smallBoldFont.drawString("this app resynthesizes your sonic world", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("this app resynthesizes your sonic world") / 2.0, 115);
-    smallBoldFont.drawString("using the sound from your microphone and", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("using the sound from your microphone and") / 2.0, 145);
-    smallBoldFont.drawString("songs you teach it from your iTunes Library", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("songs you teach it from your iTunes Library") / 2.0, 175);
+    small_bold_font.drawString("this app resynthesizes your sonic world", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("this app resynthesizes your sonic world") / 2.0, 95);
+    small_bold_font.drawString("using the sound from your microphone and", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("using the sound from your microphone and") / 2.0, 125);
+    small_bold_font.drawString("songs you teach it from your iTunes Library", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("songs you teach it from your iTunes Library") / 2.0, 155);
     
-    smallBoldFont.drawString("be sure to wear headphones", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("be sure to wear headphones") / 2.0, 215);
-    smallBoldFont.drawString("unless you like feedback", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("unless you like feedback") / 2.0, 245);
+    small_bold_font.drawString("be sure to wear headphones", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("be sure to wear headphones") / 2.0, 215);
+    small_bold_font.drawString("unless you like feedback", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("unless you like feedback") / 2.0, 245);
     
 }
 
@@ -647,7 +658,7 @@ void app::drawCheckboxes()
 	ofNoFill();
     ofSetColor(180, 140, 140);
 	
-	smallBoldFont.drawString("syncopation", checkbox1_x, checkbox1_y + 45);
+	small_bold_font.drawString("syncopation", checkbox1_x, checkbox1_y + 45);
 	
     ofSetColor(180, 180, 180);
 	ofRect(checkbox1_x, checkbox1_y, checkbox_size, checkbox_size);
@@ -662,24 +673,24 @@ void app::drawSliders()
 	ofNoFill();
 	ofSetColor(180, 140, 140);
     
-    smallBoldFont.drawString("synthesis", slider0_x, slider0_y + 25);
+    small_bold_font.drawString("synthesis", slider0_x, slider0_y + 25);
     if(!bProcessingSong)
-        smallBoldFont.drawString("microphone", slider0_x + slider_width - smallBoldFont.stringWidth("microphone"), slider0_y + 25);
+        small_bold_font.drawString("microphone", slider0_x + slider_width - small_bold_font.stringWidth("microphone"), slider0_y + 25);
     else
-        smallBoldFont.drawString("iTunes", slider0_x + slider_width - smallBoldFont.stringWidth("iTunes"), slider0_y + 25);
+        small_bold_font.drawString("iTunes", slider0_x + slider_width - small_bold_font.stringWidth("iTunes"), slider0_y + 25);
     
-    smallBoldFont.drawString("0.0", slider1_x, slider1_y + 25);
-    smallBoldFont.drawString(ofToString(MAX_GRAIN_LENGTH, 1), slider1_x + slider_width - smallBoldFont.stringWidth("1.0"), slider1_y + 25);
+    small_bold_font.drawString("0.0", slider1_x, slider1_y + 25);
+    small_bold_font.drawString(ofToString(MAX_GRAIN_LENGTH, 1), slider1_x + slider_width - small_bold_font.stringWidth("5.0"), slider1_y + 25);
 	
-    smallBoldFont.drawString("1", slider2_x, slider2_y + 25);
-    smallBoldFont.drawString(ofToString(maxVoices), slider2_x + slider_width - smallBoldFont.stringWidth(ofToString(maxVoices)), slider2_y + 25);
+    small_bold_font.drawString("1", slider2_x, slider2_y + 25);
+    small_bold_font.drawString(ofToString(maxVoices), slider2_x + slider_width - small_bold_font.stringWidth(ofToString(maxVoices)), slider2_y + 25);
 	
     ofFill();
     ofSetColor(255, 255, 255);
     
-    smallBoldFont.drawString("mix", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("mix") / 2.0, slider0_y + 25);
-    smallBoldFont.drawString("grain size (s)", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("grain size (s)") / 2.0, slider1_y + 25);
-    smallBoldFont.drawString("number of voices", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("number of voices") / 2.0, slider2_y + 25);
+    small_bold_font.drawString("mix", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("mix") / 2.0, slider0_y + 25);
+    small_bold_font.drawString("grain size (s)", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("grain size (s)") / 2.0, slider1_y + 25);
+    small_bold_font.drawString("number of voices", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("number of voices") / 2.0, slider2_y + 25);
     
     button.draw(slider0_position*slider_width + slider0_x - 10, slider0_y - 10, 20, 20);
     button.draw(slider1_position*slider_width + slider1_x - 10, slider1_y - 10, 20, 20);
@@ -694,27 +705,27 @@ void app::drawButtons()
 {
 	ofNoFill();
     ofSetColor(180, 140, 140);
-    smallBoldFont.drawString("erase my", button1_x + (button_width - smallBoldFont.stringWidth("erase my")) / 2.0, button1_y + 0.45 * button_height);
-    smallBoldFont.drawString("memory", button1_x + (button_width - smallBoldFont.stringWidth("memory")) / 2.0, button1_y + 0.75 * button_height);
+    small_bold_font.drawString("erase my", button1_x + (button_width - small_bold_font.stringWidth("erase my")) / 2.0, button1_y + 0.45 * button_height);
+    small_bold_font.drawString("memory", button1_x + (button_width - small_bold_font.stringWidth("memory")) / 2.0, button1_y + 0.75 * button_height);
     
     if(bProcessingSong)
     {
-        smallBoldFont.drawString("stop", button2_x + (button_width - smallBoldFont.stringWidth("stop")) / 2.0, button2_y + 0.45 * button_height);
-        smallBoldFont.drawString("processing", button2_x + (button_width - smallBoldFont.stringWidth("processing")) / 2.0, button2_y + 0.75 * button_height);
+        small_bold_font.drawString("stop", button2_x + (button_width - small_bold_font.stringWidth("stop")) / 2.0, button2_y + 0.45 * button_height);
+        small_bold_font.drawString("processing", button2_x + (button_width - small_bold_font.stringWidth("processing")) / 2.0, button2_y + 0.75 * button_height);
     }
     else
     {
-        smallBoldFont.drawString("use", button2_x + (button_width - smallBoldFont.stringWidth("use")) / 2.0, button2_y + 0.45 * button_height);
-        smallBoldFont.drawString("iTunes", button2_x + (button_width - smallBoldFont.stringWidth("a song")) / 2.0, button2_y + 0.75 * button_height);
+        small_bold_font.drawString("use", button2_x + (button_width - small_bold_font.stringWidth("use")) / 2.0, button2_y + 0.45 * button_height);
+        small_bold_font.drawString("iTunes", button2_x + (button_width - small_bold_font.stringWidth("a song")) / 2.0, button2_y + 0.75 * button_height);
     }
     
     if (bLearning) {
-        smallBoldFont.drawString("stop", button3_x + (button_width - smallBoldFont.stringWidth("stop")) / 2.0, button3_y + 0.45 * button_height);
-        smallBoldFont.drawString("learning", button3_x + (button_width - smallBoldFont.stringWidth("learning")) / 2.0, button3_y + 0.75 * button_height);
+        small_bold_font.drawString("stop", button3_x + (button_width - small_bold_font.stringWidth("stop")) / 2.0, button3_y + 0.45 * button_height);
+        small_bold_font.drawString("learning", button3_x + (button_width - small_bold_font.stringWidth("learning")) / 2.0, button3_y + 0.75 * button_height);
     }
     else {
-        smallBoldFont.drawString("start", button3_x + (button_width - smallBoldFont.stringWidth("start")) / 2.0, button3_y + 0.45 * button_height);
-        smallBoldFont.drawString("learning", button3_x + (button_width - smallBoldFont.stringWidth("learning")) / 2.0, button3_y + 0.75 * button_height);
+        small_bold_font.drawString("start", button3_x + (button_width - small_bold_font.stringWidth("start")) / 2.0, button3_y + 0.45 * button_height);
+        small_bold_font.drawString("learning", button3_x + (button_width - small_bold_font.stringWidth("learning")) / 2.0, button3_y + 0.75 * button_height);
     }
     
     ofSetColor(255);
@@ -730,7 +741,7 @@ void app::drawWaveform()
     int w = SCREEN_WIDTH;
     float amplitude		= h / 2.0f;
 
-    unsigned long numSamplesToRead = frameSize;
+    unsigned long numSamplesToRead = frame_size;
     float ratio = numSamplesToRead / (float)(w);
     float resolution = 4.0;
     // how many of them to keep for drawing
@@ -756,7 +767,7 @@ void app::drawWaveform()
     ofPushStyle();
     ofNoFill();
     ofPushMatrix();
-    ofSetColor(140, 180, 180, 40);
+    ofSetColor(140, 180, 180, 60);
     ofSetLineWidth(1.0);
     ofTranslate(padding, h / 2.0);
     ofEnableSmoothing();
@@ -784,16 +795,45 @@ void app::draw()
     ofEnableAntiAliasing();
     
     
-    if (bInteractiveMode) {
-        drawInteractiveMode();
+    ofBackground(0);
+    ofSetColor(255);
+    ofEnableAlphaBlending();
+    
+    bDrawNeedsUpdate = true;
 
+    fbo3.begin();
+    ofBackground(0);
+    
+    
+    int s = audio_database->getSize();
+    if ( s < 32 )
+        ofSetColor(s/32.0 * 64.0);
+    else
+        ofSetColor(255);
+    
+    if(bDrawOptions)
+    {
+        drawOptions();
+        fbo.draw(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        
+    }
+    else
+    {
+        drawInteractionScreen();
+        fbo2.draw(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        
     }
     
-    else {
-        drawPassiveListeningMode();
-        
-        
-    }
+    
+    ofSetColor(180, 140, 140);
+    
+    string numData = string("size: ") + ofToString(audio_database->getSize());
+    small_bold_font.drawString(numData,
+                             SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth(numData) / 2.0,
+                             70 * height_ratio);
+    
+    ofDisableAlphaBlending();
+
     
     
 //    ofRect(0, 0, 50, 50);
@@ -801,12 +841,12 @@ void app::draw()
     
     ofEnableAlphaBlending();
     
-    ofSetColor(140, 180, 180, 180);
+    ofSetColor(180, 140, 140);
     buttonInfo.draw(SCREEN_WIDTH - button_height / 2.0 - 10, 10, button_height / 2.0, button_height / 2.0);
     drawWaveform();
     
-    ofSetColor(200, 200, 200);
-    largeBoldFont.drawString("memory mosaic", SCREEN_WIDTH / 2.0 - largeBoldFont.stringWidth("memory mosaic") / 2.0, 40 * height_ratio);
+    ofSetColor(240, 240, 240);
+    large_bold_font.drawString("memory mosaic", SCREEN_WIDTH / 2.0 - large_bold_font.stringWidth("memory mosaic") / 2.0, 40 * height_ratio);
     
     drawHelp();
     
@@ -816,7 +856,7 @@ void app::draw()
         ofRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         ofNoFill();
         ofSetColor(255, 255, 255);
-        smallBoldFont.drawString("No more free memory for learning", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("No more free memory for learning") / 2.0, 290 * height_ratio);
+        small_bold_font.drawString("No more free memory for learning", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("No more free memory for learning") / 2.0, 290 * height_ratio);
     }
     
     else if (bConvertingSong) {
@@ -825,7 +865,7 @@ void app::draw()
         ofRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         ofNoFill();
         ofSetColor(255, 255, 255);
-        smallBoldFont.drawString("Converting song for processing...", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("Converting song for processing...") / 2.0, 160 * height_ratio);
+        small_bold_font.drawString("Converting song for processing...", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("Converting song for processing...") / 2.0, 160 * height_ratio);
     }
     
     else if(bWaitingForUserToPickSong) {
@@ -834,7 +874,7 @@ void app::draw()
         ofRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
         ofNoFill();
         ofSetColor(255, 255, 255);
-        smallBoldFont.drawString("Loading iTunes Library...", SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth("Loading iTunes Library...") / 2.0, 160 * height_ratio);
+        small_bold_font.drawString("Loading iTunes Library...", SCREEN_WIDTH / 2.0 - small_bold_font.stringWidth("Loading iTunes Library...") / 2.0, 160 * height_ratio);
     }
     ofDisableAlphaBlending();
     
@@ -847,32 +887,40 @@ void app::draw()
         animationCounter++;
         ofDisableAlphaBlending();
     }
+    
+//    ofRect(0, 0, SCREEN_WIDTH*scale_factor, SCREEN_HEIGHT*scale_factor);
+    
+    fbo3.end();
+    
+    fbo3.draw(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+//    cout << "w: " << SCREEN_WIDTH << " h: " << SCREEN_HEIGHT << endl;
+
 }
 
 //--------------------------------------------------------------
-void app::drawInteractiveMode() {
+void app::drawInteractionScreen() {
     
     if (bDrawNeedsUpdate)
     {
-        myFBO.begin();
+        if (bDetectedOnset)
+            audio_database->updateScreenMapping();
+        
+        fbo2.begin();
         ofBackground(0);
         ofEnableAlphaBlending();
         ofSetColor(255);
         
-        audioDatabase->drawDatabase(ofGetWidth(), ofGetHeight());
-        buttonScreenInteraction.draw(10, 10, button_height / 2, button_height / 2);
+        audio_database->drawDatabase(SCREEN_WIDTH, SCREEN_HEIGHT);
         
         ofDisableAlphaBlending();
         
-        myFBO.end();
+        buttonMenuSliders.draw(10, 10, button_height / 2, button_height / 2);
+        
+        fbo2.end();
         bDrawNeedsUpdate = false;
     }
     
-    ofBackground(0);
-    ofSetColor(255);
-    ofEnableAlphaBlending();
-    myFBO.draw(0,0);
-    ofDisableAlphaBlending();
+    
 }
 
 void app::drawHelp()
@@ -886,14 +934,21 @@ void app::drawHelp()
             
             ofSetColor(0, 0, 0, 240);
             ofRect(0,  SCREEN_HEIGHT / 2.0 - 35 , SCREEN_WIDTH, 110);
-            ofSetColor(255);
-            string str = "Each circle represents a learned sound fragment";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 - 25 );
-            str = "Touch any of the sound fragments to play them back";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 + 5);
             
-            str = "Or go back to the previous screen to learn more sounds";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 + 65);
+            ofFill();
+            ofSetColor(255, 255, 255);
+            string str = "Each circle represents a learned sound fragment.";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 - 65 );
+            str = "Touch anywhere on the screen";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 - 35);
+            str = "to interactively play back the sounds.";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 - 5);
+            
+            str = "Or go back to the previous screen";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 + 65);
+            str = "to learn more sounds.";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, SCREEN_HEIGHT / 2.0 + 95);
+            
         }
         
     }
@@ -904,25 +959,28 @@ void app::drawHelp()
             ofSetColor(0, 0, 0, 240);
             ofRect(0,  0, SCREEN_WIDTH, slider0_y - 25);
             ofSetColor(255);
-            string str = "This slider controls the mix between the automatically";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y - 55);
-            str = "created synthesis and the input (microphone or ITunes)";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y - 35);
+            string str = "This slider controls the mix between";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y - 75);
+            str = "the automatically created synthesis";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y - 55);
+            str = "and the input (microphone or ITunes)";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y - 35);
+            
             ofLine(button2_x + button_width / 2, slider0_y, SCREEN_WIDTH/2, slider0_y - 15);
             
             //                str = "of either the microphone or a song.";
-            //                infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y + 35);
+            //                info_font.drawString(str, SCREEN_WIDTH/2 - info_font.stringWidth(str) / 2, slider0_y + 35);
             
             ofSetColor(0, 0, 0, 240);
             ofRect(0,  slider2_y + 45, SCREEN_WIDTH, 95);
             ofSetColor(255);
-            str = "This slider controls the how many sounds are used";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider2_y + 65);
+            str = "This slider controls the how many sounds";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider2_y + 65);
             str = "to try to synthesize the input sound";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider2_y + 85);
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider2_y + 85);
             ofLine(button2_x + button_width / 2, slider2_y + 30, SCREEN_WIDTH/2, slider2_y + 45);
             
-            infoFont.drawString("1 of 3", SCREEN_WIDTH - 55, SCREEN_HEIGHT - 10);
+            small_bold_font.drawString("1 of 3", SCREEN_WIDTH - 55, SCREEN_HEIGHT - 10);
             
         }
         else if(bDrawHelp == 2) {
@@ -931,12 +989,15 @@ void app::drawHelp()
             ofRect(0,  0, SCREEN_WIDTH, button1_y - 10);
             ofSetColor(255);
             
-            string str = "When learning is on, any new interesting sounds";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y - 25);
-            str = "from the input are stored. These new sounds are used";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y - 5);
-            str = "in the synthesis, or during interactive mode";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y + 15);
+            string str = "When learning is on, any new";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y - 45);
+            str = "interesting sounds from the input are";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y - 25);
+            str = "stored and represented by a new circle.";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y - 5);
+            str = "These sound segments are used for synthesis.";
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y + 15);
+            
             ofLine(button3_x + 30 + button_width, slider0_y - 10,
                    button3_x + 40 + button_width, slider0_y - 10);
             ofLine(button3_x + 40 + button_width, slider0_y - 10,
@@ -947,7 +1008,7 @@ void app::drawHelp()
             
             
             str = "Erasing the memory removes any learned segments";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y + 60);
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y + 60);
             ofLine(button1_x - 35, slider0_y + 55,
                    button1_x - 20, slider0_y + 55);
             ofLine(button1_x - 35, slider0_y + 55,
@@ -957,11 +1018,12 @@ void app::drawHelp()
             
             
             str = "You can also pick a song from your ITunes Library";
-            infoFont.drawString(str, SCREEN_WIDTH/2 - infoFont.stringWidth(str) / 2, slider0_y + 115);
+            small_bold_font.drawString(str, SCREEN_WIDTH/2 - small_bold_font.stringWidth(str) / 2, slider0_y + 115);
             ofLine(button2_x + button_width / 2, button2_y, SCREEN_WIDTH/2, slider0_y + 125);
             
             
-            infoFont.drawString("2 of 3", SCREEN_WIDTH - 55, SCREEN_HEIGHT - 10);
+            small_bold_font.drawString("2 of 3", SCREEN_WIDTH - 55, SCREEN_HEIGHT - 10);
+            
         }
         else if(bDrawHelp == 3) {
             
@@ -970,65 +1032,45 @@ void app::drawHelp()
             ofSetColor(255);
             
             string str = "After learning a few sounds, you can also";
-            infoFont.drawString(str, SCREEN_WIDTH / 2 - infoFont.stringWidth(str) / 2, slider0_y);
+            small_bold_font.drawString(str, SCREEN_WIDTH / 2 - small_bold_font.stringWidth(str) / 2, slider0_y);
             str = "interactively play them with your touchscreen";
-            infoFont.drawString(str, SCREEN_WIDTH / 2 - infoFont.stringWidth(str) / 2, slider0_y + 20);
+            small_bold_font.drawString(str, SCREEN_WIDTH / 2 - small_bold_font.stringWidth(str) / 2, slider0_y + 20);
             
             ofLine(10 + button_height / 4, 10 + button_height, 10 + button_height / 4, slider0_y + 10);
             ofLine(30 + button_height / 4, slider0_y + 10, 10 + button_height / 4, slider0_y + 10);
             
-            buttonScreenSliders.draw(10, 10, button_height / 2, button_height / 2);
+            buttonScreenInteraction.draw(10, 10, button_height / 2, button_height / 2);
             
-            infoFont.drawString("3 of 3", SCREEN_WIDTH - 55, SCREEN_HEIGHT - 10);
+            small_bold_font.drawString("3 of 3", SCREEN_WIDTH - 55, SCREEN_HEIGHT - 10);
         }
     }
 }
 
 
 //--------------------------------------------------------------
-void app::drawPassiveListeningMode()
+void app::drawOptions()
 {
     if (bDrawNeedsUpdate) {
         
-        myFBO.begin();
+        fbo.begin();
         ofBackground(0);
         ofEnableAlphaBlending();
-        ofTranslate(-7, 0, 0);
+//        ofPushMatrix();
+//        ofTranslate(-7, 0, 0);
+//        ofPopMatrix();
         ofFill();
-        ofSetColor(200, 200, 200);
+        ofSetColor(255);
         
 		drawButtons();
 		drawSliders();
         
+        buttonScreenInteraction.draw(10, 10, button_height / 2, button_height / 2);
+        
         ofDisableAlphaBlending();
-        myFBO.end();
+        fbo.end();
         
         bDrawNeedsUpdate = false;
     }
-    
-    
-    ofBackground(0);
-    ofSetColor(255);
-    ofEnableAlphaBlending();
-    myFBO.draw(0,0);
-    
-    
-    int s = audioDatabase->getSize();
-    if ( s < 32 )
-        ofSetColor(s/32.0 * 64.0);
-    else
-        ofSetColor(255);
-    buttonScreenSliders.draw(10, 10, button_height / 2, button_height / 2);
-    
-    ofSetColor(180, 140, 140);
-    
-    string numData = string("size: ") + ofToString(audioDatabase->getSize());
-    smallBoldFont.drawString(numData,
-                             SCREEN_WIDTH / 2.0 - smallBoldFont.stringWidth(numData) / 2.0,
-                             70 * height_ratio);
-    
-    ofDisableAlphaBlending();
-    
     
 
 //    else if(segmentationCounter < segmentationtime) {
@@ -1044,6 +1086,20 @@ void app::drawPassiveListeningMode()
 void app::audioOut(float * output, int bufferSize,
                    int ch)
 {
+    if(bufferSize < frame_size && bufferSize > 0)
+    {
+        cout << "[WARNING]!!! Frame size changed!!! Not sure how this shit will work now..." << endl;
+        cout << "frame_size: " << bufferSize << endl;
+        ring_buffer->setFrameSize(bufferSize);
+        spectral_flux->setFrameSize(bufferSize);
+        itunes_stream.setFrameSize(bufferSize);
+        
+        current_segment = pkm::Mat(SAMPLE_RATE / frame_size * 5, bufferSize, true);
+        current_itunes_segment = pkm::Mat(SAMPLE_RATE / frame_size * 5, bufferSize, true);
+        
+        frame_size = bufferSize;
+    }
+    
     bSemaphore = true;
     vector<ofPtr<pkmAudioSegment> >::iterator it;
     
@@ -1052,107 +1108,121 @@ void app::audioOut(float * output, int bufferSize,
     
     // if we detected a segment
     if((!bInteractiveMode && bDetectedOnset) ||
-       (bInteractiveMode && bTouching))
+       bInteractiveMode)
     {
         // find matches
         vector<ofPtr<pkmAudioSegment> > newSegments;
         if (bInteractiveMode)
         {
-            if(bTouching)
-            {
-                newSegments = audioDatabase->selectFromDatabase(touchX, touchY, SCREEN_WIDTH, SCREEN_HEIGHT);
-                bTouching = false;
+            for (int i = 0; i < 2; i++) {
+
+                if(bTouching[i])
+                {
+                    vector<ofPtr<pkmAudioSegment> > this_segments = audio_database->selectFromDatabase(touchX[i], touchY[i], SCREEN_WIDTH, SCREEN_HEIGHT);
+                    for (vector<ofPtr<pkmAudioSegment> >::iterator it = this_segments.begin(); it != this_segments.end(); it++) {
+                        newSegments.push_back(*it);
+                    }
+                    bTouching[i] = false;
+                }
+                else if(bUntouched[i])
+                {
+                    audio_database->unSelectFromDatabase(touchX[i], touchY[i], SCREEN_WIDTH, SCREEN_HEIGHT);
+                    bUntouched[i] = false;
+                }
             }
         }
         else
-            newSegments = audioDatabase->getNearestAudioSegments(foreground_features);
+            newSegments = audio_database->getNearestAudioSegments(foreground_features);
 
-        int totalSegments = newSegments.size() + nearestAudioSegments.size();
+        int totalSegments = newSegments.size() + nearest_audio_segments.size();
         
         // if we are syncopated, we force fade out of old segments
         if (bSyncopated) {
-            it = nearestAudioSegments.begin();
-            while( it != nearestAudioSegments.end() )
+            it = nearest_audio_segments.begin();
+            while( it != nearest_audio_segments.end() )
             {
                 
-                //printf("frame: %d\n", ((*it)->onset + (*it)->frame*frameSize) / frameSize);
+                //printf("frame: %d\n", ((*it)->onset + (*it)->frame*frame_size) / frame_size);
                 // get frame
 #ifdef DO_FILEBASED_SEGMENTS
                 pkmEXTAudioFileReader reader;
                 reader.open(ofToDataPath((*it)->filename), sampleRate);
-                long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frameSize;
+                long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frame_size;
                 reader.read(buffer,
                             sampleStart,
-                            (long)frameSize,
+                            (long)frame_size,
                             sampleRate);
                 reader.close();
 #else
-                cblas_scopy(frameSize, (*it)->buffer + (*it)->frame*frameSize, 1, buffer, 1);
+                cblas_scopy(frame_size, (*it)->buffer + (*it)->frame*frame_size, 1, buffer, 1);
 #endif
-                //printf("%s: %ld, %ld\n", (*it)->filename.c_str(), sampleStart, (long)frameSize);
+                //printf("%s: %ld, %ld\n", (*it)->filename.c_str(), sampleStart, (long)frame_size);
+                (*it)->bNeedsReset = false;
                 (*it)->bPlaying = false;
                 (*it)->frame = 0;
                 it++;
                 
+#ifdef DO_REALTIME_FADING
                 // mix in
                 //vDSP_vsmul(buffer, 1, &level, buffer, 1, fadeLength);
-#ifdef DO_REALTIME_FADING
                 // fade out
-                vDSP_vmul(buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                vDSP_vmul(buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutBuffer, 1,
-                          buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                          buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutLength);
 #endif
-                vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frameSize);
+                vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frame_size);
                 
             }
             
-            nearestAudioSegments.clear();
+            nearest_audio_segments.clear();
         }
         // otherwise we playback old nearest neighbors as normal
         else
         {
-            vector<ofPtr<pkmAudioSegment> >::iterator it = nearestAudioSegments.begin();
-            while(it != nearestAudioSegments.end())
+            vector<ofPtr<pkmAudioSegment> >::iterator it = nearest_audio_segments.begin();
+            while(it != nearest_audio_segments.end())
             {
                 // get frame
 #ifdef DO_FILEBASED_SEGMENTS
                 pkmEXTAudioFileReader reader;
                 reader.open(ofToDataPath((*it)->filename), sampleRate);
-                long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frameSize;
+                long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frame_size;
                 reader.read(buffer,
                             sampleStart,
-                            (long)frameSize,
+                            (long)frame_size,
                             sampleRate);
                 reader.close();
 #else
-                cblas_scopy(frameSize, (*it)->buffer + (*it)->frame*frameSize, 1, buffer, 1);
+                cblas_scopy(frame_size, (*it)->buffer + (*it)->frame*frame_size, 1, buffer, 1);
 #endif
-                //printf("%s: %ld, %ld\n", (*it)->filename.c_str(), sampleStart, (long)frameSize);
+                //printf("%s: %ld, %ld\n", (*it)->filename.c_str(), sampleStart, (long)frame_size);
                 (*it)->frame++;
                 
                 // mix in
-                //vDSP_vsmul(buffer, 1, &level, buffer, 1, frameSize);
+                //vDSP_vsmul(buffer, 1, &level, buffer, 1, frame_size);
                 
-                if (((*it)->onset + (*it)->frame*frameSize) >= (*it)->offset)
+                if (((*it)->onset + (*it)->frame*frame_size) >= (*it)->offset ||
+                    (*it)->bNeedsReset)
                 {
 #ifdef DO_REALTIME_FADING
                     // fade out
-                    vDSP_vmul(buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                    vDSP_vmul(buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                               pkmAudioWindow::rampOutBuffer, 1,
-                              buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                              buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                               pkmAudioWindow::rampOutLength);
 #endif
+                    (*it)->bNeedsReset = false;
                     (*it)->bPlaying = false;
                     (*it)->frame = 0;
-                    it = nearestAudioSegments.erase(it);
+                    it = nearest_audio_segments.erase(it);
                 }
                 else if((*it)->bNeedsReset)
                 {
                     // fade out
-                    vDSP_vmul(buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                    vDSP_vmul(buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                               pkmAudioWindow::rampOutBuffer, 1,
-                              buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                              buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                               pkmAudioWindow::rampOutLength);
                     (*it)->frame = 0;
                     (*it)->bNeedsReset = false;
@@ -1161,54 +1231,58 @@ void app::audioOut(float * output, int bufferSize,
                 else
                     it++;
                 
-                vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frameSize);
+                vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frame_size);
             }
         }
         
-        totalSegments = nearestAudioSegments.size();
+        totalSegments = nearest_audio_segments.size();
         
         // fade in new segments and store them for next frame
         it = newSegments.begin();
         while( it != newSegments.end() )
         {
-#ifdef DO_FILEBASED_SEGMENTS
-            pkmEXTAudioFileReader reader;
-            reader.open(ofToDataPath((*it)->filename), sampleRate);
-            long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frameSize;
-            reader.read(buffer,
-                        sampleStart,  // should be 0...
-                        (long)frameSize,
-                        sampleRate);
-            reader.close();
-#else
-            cblas_scopy(frameSize, (*it)->buffer + (*it)->frame*frameSize, 1, buffer, 1);
-            
-//            cout << (*it)->index << endl;
-            
-            //audioDatabase->featureDatabase.printAbbrev();
-#endif
-            (*it)->frame++;
-            (*it)->bPlaying = true;
-            
-#ifdef DO_REALTIME_FADING
-            // fade in
-            vDSP_vmul(buffer, 1,
-                      pkmAudioWindow::rampInBuffer, 1,
-                      buffer, 1,
-                      pkmAudioWindow::rampInLength);
-#endif
-            
-            // check if segment is ready for fade out, i.e. segment is only "frameSize" samples
-            if (((*it)->onset + (*it)->frame*frameSize) >= (*it)->offset)
+            if (random() % 2)
+            {
+    #ifdef DO_FILEBASED_SEGMENTS
+                pkmEXTAudioFileReader reader;
+                reader.open(ofToDataPath((*it)->filename), sampleRate);
+                long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frame_size;
+                reader.read(buffer,
+                            sampleStart,  // should be 0...
+                            (long)frame_size,
+                            sampleRate);
+                reader.close();
+    #else
+                cblas_scopy(frame_size, (*it)->buffer + (*it)->frame*frame_size, 1, buffer, 1);
+                
+    //            cout << (*it)->index << endl;
+                
+                //audio_database->featureDatabase.printAbbrev();
+    #endif
+                
+                (*it)->frame++;
+                (*it)->bPlaying = true;
+                
+    #ifdef DO_REALTIME_FADING
+                // fade in
+                vDSP_vmul(buffer, 1,
+                          pkmAudioWindow::rampInBuffer, 1,
+                          buffer, 1,
+                          pkmAudioWindow::rampInLength);
+    #endif
+            }
+            // check if segment is ready for fade out, i.e. segment is only "frame_size" samples
+            if (((*it)->onset + (*it)->frame*frame_size) >= (*it)->offset ||
+                (*it)->bNeedsReset)
             {
 #ifdef DO_REALTIME_FADING
                 // fade out
-                vDSP_vmul(buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                vDSP_vmul(buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutBuffer, 1,
-                          buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                          buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutLength);
 #endif
-                
+                (*it)->bNeedsReset = false;
                 (*it)->bPlaying = false;
                 (*it)->frame = 0;
                 it = newSegments.erase(it);
@@ -1220,59 +1294,71 @@ void app::audioOut(float * output, int bufferSize,
             }
             
             // and mix in the faded segment to the stream
-            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frameSize);
+            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frame_size);
         }
         
         // store new segments
-        nearestAudioSegments.insert(nearestAudioSegments.end(), newSegments.begin(), newSegments.end());
+        nearest_audio_segments.insert(nearest_audio_segments.end(), newSegments.begin(), newSegments.end());
         
     }
     // no onset, continue playback of old nearest neighbors
     else
     {
         // loop through all previous neighbors
-        vector<ofPtr<pkmAudioSegment> >::iterator it = nearestAudioSegments.begin();
-        while(it != nearestAudioSegments.end())
+        vector<ofPtr<pkmAudioSegment> >::iterator it = nearest_audio_segments.begin();
+        while(it != nearest_audio_segments.end())
         {
 #ifdef DO_FILEBASED_SEGMENTS
             // get audio frame
             pkmEXTAudioFileReader reader;
             reader.open(ofToDataPath((*it)->filename), sampleRate);
-            long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frameSize;
+            long sampleStart = (long)(*it)->onset + (long)(*it)->frame*frame_size;
             reader.read(buffer,
                         sampleStart,
-                        (long)frameSize,
+                        (long)frame_size,
                         sampleRate);
             reader.close();
 #else
-            cblas_scopy(frameSize, (*it)->buffer + (*it)->frame*frameSize, 1, buffer, 1);
+            cblas_scopy(frame_size, (*it)->buffer + (*it)->frame*frame_size, 1, buffer, 1);
 #endif
-            //printf("%s: %ld, %ld\n", (*it)->filename.c_str(), sampleStart, (long)frameSize);
+            //printf("%s: %ld, %ld\n", (*it)->filename.c_str(), sampleStart, (long)frame_size);
+            
+            if((*it)->frame == 0)
+            {
+#ifdef DO_REALTIME_FADING
+                // fade in
+                vDSP_vmul(buffer, 1,
+                          pkmAudioWindow::rampInBuffer, 1,
+                          buffer, 1,
+                          pkmAudioWindow::rampInLength);
+#endif
+            }
             
             (*it)->frame++;
             
             // finished playing audio segment?
-            if ((*it)->onset + (*it)->frame*frameSize  >= (*it)->offset)
+            if ((*it)->onset + (*it)->frame*frame_size  >= (*it)->offset ||
+                (*it)->bNeedsReset)
             {
 #ifdef DO_REALTIME_FADING
                 // fade out
-                vDSP_vmul(buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                vDSP_vmul(buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutBuffer, 1,
-                          buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                          buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutLength);
 #endif
-                
+                (*it)->bNeedsReset = false;
                 (*it)->bPlaying = false;
                 (*it)->frame = 0;
-                it = nearestAudioSegments.erase(it);
+                it = nearest_audio_segments.erase(it);
             }
             
             else if((*it)->bNeedsReset)
             {
                 // fade out
-                vDSP_vmul(buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                vDSP_vmul(buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutBuffer, 1,
-                          buffer + frameSize - pkmAudioWindow::rampOutLength, 1,
+                          buffer + frame_size - pkmAudioWindow::rampOutLength, 1,
                           pkmAudioWindow::rampOutLength);
                 (*it)->frame = 0;
                 (*it)->bNeedsReset = false;
@@ -1284,7 +1370,7 @@ void app::audioOut(float * output, int bufferSize,
                 it++;
             
             // mix in
-            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frameSize);
+            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frame_size);
         }
     }
     
@@ -1293,40 +1379,39 @@ void app::audioOut(float * output, int bufferSize,
     if (!bInteractiveMode) {
         if(bProcessingSong)
         {
-            vDSP_vsmul(itunes_frame, 1, &slider0_position, buffer, 1, frameSize);
+            vDSP_vsmul(itunes_frame, 1, &slider0_position, buffer, 1, frame_size);
             float mixR = 1.0f - slider0_position;
-            vDSP_vsmul(output_mono, 1, &mixR, output_mono, 1, frameSize);
-            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frameSize);
+            vDSP_vsmul(output_mono, 1, &mixR, output_mono, 1, frame_size);
+            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frame_size);
         }
         else
         {
-            vDSP_vsmul(current_frame, 1, &slider0_position, buffer, 1, frameSize);
+            vDSP_vsmul(current_frame, 1, &slider0_position, buffer, 1, frame_size);
             float mixR = 1.0f - slider0_position;
-            vDSP_vsmul(output_mono, 1, &mixR, output_mono, 1, frameSize);
-            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frameSize);
+            vDSP_vsmul(output_mono, 1, &mixR, output_mono, 1, frame_size);
+            vDSP_vadd(buffer, 1, output_mono, 1, output_mono, 1, frame_size);
         }
     }
     
 	
 #ifdef DO_RECORD
-	audioInputFileWriter.write(current_frame, output_frame*frameSize, frameSize);
-	audioOutputFileWriter.write(output_mono, output_frame*frameSize, frameSize);
+	audioInputFileWriter.write(current_frame, output_frame*frame_size, frame_size);
+	audioOutputFileWriter.write(output_mono, output_frame*frame_size, frame_size);
 	output_frame++;
 #endif
     
-    for (int i = 0; i < frameSize; i++)
+    for (int i = 0; i < frame_size; i++)
     {
-//        output_mono[i] = compressor.compressor(loresFilter.lores(output_mono[i], 8000, 1.0), 0.65, 0.75, 1.0, 0.995);
         output_mono[i] = compressor.compressor(output_mono[i], 0.65, 0.75, 1.0, 0.995);
     }
     
     float neg = -1.0f, pos = 1.0f;
     
-    vDSP_vclip(output_mono, 1, &neg, &pos, output_mono, 1, frameSize);
+    vDSP_vclip(output_mono, 1, &neg, &pos, output_mono, 1, frame_size);
 	
 	// mix to stereo
-    cblas_scopy(frameSize, output_mono, 1, output, 2);
-    cblas_scopy(frameSize, output_mono, 1, output+1, 2);
+    cblas_scopy(frame_size, output_mono, 1, output, 2);
+    cblas_scopy(frame_size, output_mono, 1, output+1, 2);
     
     bSemaphore = false;
 }
@@ -1334,66 +1419,67 @@ void app::audioOut(float * output, int bufferSize,
 void app::processITunesInputFrame()
 {
     // check for max segment
-    bool bMaxSegmentReached = currentITunesSegment.isCircularInsertionFull();
+    bool bMaxSegmentReached = current_itunes_segment.isCircularInsertionFull();
     
     // parse segment
     if(bDetectedOnset || bMaxSegmentReached)
     {
-        int segmentSize = bMaxSegmentReached ? currentITunesSegment.rows : currentITunesSegment.current_row;
+        int segment_frame_nums = bMaxSegmentReached ? current_itunes_segment.rows : current_itunes_segment.current_row;
         
-        pkm::Mat croppedFeature(segmentSize, numFeatures, currentITunesSegmentFeatures.data, false);
+        pkm::Mat croppedFeature(segment_frame_nums, numFeatures, current_itunes_segment_features.data, false);
         pkm::Mat meanFeature = croppedFeature.mean();
         //meanFeature.print();
-        if (true)//audioDatabase->bShouldAddSegment(meanFeature.data))
+        if (true)//audio_database->bShouldAddSegment(meanFeature.data))
         {
             currentFile++;
+#ifndef DO_REALTIME_FADING
             // fade in
-            vDSP_vmul(currentITunesSegment.data, 1,
+            vDSP_vmul(current_itunes_segment.data, 1,
                       pkmAudioWindow::rampInBuffer, 1,
-                      currentITunesSegment.data, 1,
+                      current_itunes_segment.data, 1,
                       pkmAudioWindow::rampInLength);
             // fade out
-            vDSP_vmul(currentITunesSegment.data + segmentSize * frameSize - pkmAudioWindow::rampOutLength, 1,
+            vDSP_vmul(current_itunes_segment.data + segment_frame_nums * frame_size - pkmAudioWindow::rampOutLength, 1,
                       pkmAudioWindow::rampOutBuffer, 1,
-                      currentITunesSegment.data + segmentSize * frameSize - pkmAudioWindow::rampOutLength, 1,
+                      current_itunes_segment.data + segment_frame_nums * frame_size - pkmAudioWindow::rampOutLength, 1,
                       pkmAudioWindow::rampOutLength);
+#endif
             
 #ifdef DO_FILEBASED_SEGMENTS
             pkmEXTAudioFileWriter writer;
             char buf[256];
             sprintf(buf, "%saudiofile_%08d.wav", documentsDirectory.c_str(), currentFile);
-            if(!writer.open(ofToDataPath(buf), frameSize, sampleRate))
+            if(!writer.open(ofToDataPath(buf), frame_size, sampleRate))
             {
                 printf("[ERROR] Could not write file!\n");
                 OF_EXIT_APP(0);
             }
-            writer.write(currentITunesSegment.data, 0, segmentSize * frameSize);
+            writer.write(current_itunes_segment.data, 0, segment_frame_nums * frame_size);
             writer.close();
             ofPtr<pkmAudioSegment> audio_segment( new pkmAudioSegment(buf,
                                                                       0,
-                                                                      segmentSize * frameSize,
+                                                                      segment_frame_nums * frame_size,
                                                                       currentFile ) );
 #else
-            ofPtr<pkmAudioSegment> audio_segment( new pkmAudioSegment(currentITunesSegment.data,
+            ofPtr<pkmAudioSegment> audio_segment( new pkmAudioSegment(current_itunes_segment.data,
                                                                       0,
-                                                                      segmentSize * frameSize,
+                                                                      segment_frame_nums * frame_size,
                                                                       currentFile ) );
 #endif
-            //            audioDatabase->addAudioSequence(audio_segment, currentITunesSegmentFeatures);
-            //            audioDatabase->addAudioSegment(audio_segment, currentITunesSegmentFeatures.data, numFeatures);
-//            audioDatabase->addAudioSegment(audio_segment, meanFeature.data, numFeatures);
-            audioDatabase->addAudioSegment(audio_segment, croppedFeature.row(0), numFeatures);
-            audioDatabase->buildIndex();
-            audioDatabase->updateScreenMapping();
+            //            audio_database->addAudioSequence(audio_segment, current_itunes_segment_features);
+            //            audio_database->addAudioSegment(audio_segment, current_itunes_segment_features.data, numFeatures);
+//            audio_database->addAudioSegment(audio_segment, meanFeature.data, numFeatures);
+            audio_database->addAudioSegment(audio_segment, croppedFeature.row(0), numFeatures);
+            audio_database->buildIndex();
             
             //            logMemUsage();
-            //            if (audioDatabase->featureDatabase.rows > 5) {
-            //                pkmAudioFeatureNormalizer::normalizeDatabase(audioDatabase->featureDatabase);
+            //            if (audio_database->featureDatabase.rows > 5) {
+            //                pkmAudioFeatureNormalizer::normalizeDatabase(audio_database->featureDatabase);
             //            }
         }
         
-        currentITunesSegment.resetCircularRowCounter();
-        currentITunesSegmentFeatures.resetCircularRowCounter();
+        current_itunes_segment.resetCircularRowCounter();
+        current_itunes_segment_features.resetCircularRowCounter();
         
         bDrawNeedsUpdate = true;
     }
@@ -1404,66 +1490,67 @@ void app::processITunesInputFrame()
 void app::processInputFrame()
 {
     // check for max segment
-    bool bMaxSegmentReached = currentSegment.isCircularInsertionFull();
+    bool bMaxSegmentReached = current_segment.isCircularInsertionFull();
     
     // parse segment
     if(bDetectedOnset || bMaxSegmentReached)
     {
-        int segmentSize = bMaxSegmentReached ? currentSegment.rows : currentSegment.current_row;
+        int segment_frame_nums = bMaxSegmentReached ? current_segment.rows : current_segment.current_row;
         
-        pkm::Mat croppedFeature(segmentSize, numFeatures, currentSegmentFeatures.data, false);
+        pkm::Mat croppedFeature(segment_frame_nums, numFeatures, current_segment_features.data, false);
         pkm::Mat meanFeature = croppedFeature.mean();
         //meanFeature.print();
-        if (true)//audioDatabase->bShouldAddSegment(meanFeature.data))
+        if (true)//audio_database->bShouldAddSegment(meanFeature.data))
         {
             currentFile++;
+#ifndef DO_REALTIME_FADING
             // fade in
-            vDSP_vmul(currentSegment.data, 1,
+            vDSP_vmul(current_segment.data, 1,
                       pkmAudioWindow::rampInBuffer, 1,
-                      currentSegment.data, 1,
+                      current_segment.data, 1,
                       pkmAudioWindow::rampInLength);
             // fade out
-            vDSP_vmul(currentSegment.data + segmentSize * frameSize - pkmAudioWindow::rampOutLength, 1,
+            vDSP_vmul(current_segment.data + segment_frame_nums * frame_size - pkmAudioWindow::rampOutLength, 1,
                       pkmAudioWindow::rampOutBuffer, 1,
-                      currentSegment.data + segmentSize * frameSize - pkmAudioWindow::rampOutLength, 1,
+                      current_segment.data + segment_frame_nums * frame_size - pkmAudioWindow::rampOutLength, 1,
                       pkmAudioWindow::rampOutLength);
+#endif
             
 #ifdef DO_FILEBASED_SEGMENTS
             pkmEXTAudioFileWriter writer;
             char buf[256];
             sprintf(buf, "%saudiofile_%08d.wav", documentsDirectory.c_str(), currentFile);
-            if(!writer.open(ofToDataPath(buf), frameSize, sampleRate))
+            if(!writer.open(ofToDataPath(buf), frame_size, sampleRate))
             {
                 printf("[ERROR] Could not write file!\n");
                 OF_EXIT_APP(0);
             }
-            writer.write(currentSegment.data, 0, segmentSize * frameSize);
+            writer.write(current_segment.data, 0, segment_frame_nums * frame_size);
             writer.close();
             ofPtr<pkmAudioSegment> audio_segment( new pkmAudioSegment(buf,
                                                                       0,
-                                                                      segmentSize * frameSize,
+                                                                      segment_frame_nums * frame_size,
                                                                       currentFile ) );
 #else
-            ofPtr<pkmAudioSegment> audio_segment( new pkmAudioSegment(currentSegment.data,
+            ofPtr<pkmAudioSegment> audio_segment( new pkmAudioSegment(current_segment.data,
                                                                       0,
-                                                                      segmentSize * frameSize,
+                                                                      segment_frame_nums * frame_size,
                                                                       currentFile ) );
 #endif
-//            audioDatabase->addAudioSequence(audio_segment, currentSegmentFeatures);
-//            audioDatabase->addAudioSegment(audio_segment, currentSegmentFeatures.data, numFeatures);
-//            audioDatabase->addAudioSegment(audio_segment, meanFeature.data, numFeatures);
-            audioDatabase->addAudioSegment(audio_segment, croppedFeature.row(0), numFeatures);
-            audioDatabase->buildIndex();
-            audioDatabase->updateScreenMapping();
+//            audio_database->addAudioSequence(audio_segment, current_segment_features);
+//            audio_database->addAudioSegment(audio_segment, current_segment_features.data, numFeatures);
+//            audio_database->addAudioSegment(audio_segment, meanFeature.data, numFeatures);
+            audio_database->addAudioSegment(audio_segment, croppedFeature.row(0), numFeatures);
+            audio_database->buildIndex();
             
             //            logMemUsage();
-            //            if (audioDatabase->featureDatabase.rows > 5) {
-            //                pkmAudioFeatureNormalizer::normalizeDatabase(audioDatabase->featureDatabase);
+            //            if (audio_database->featureDatabase.rows > 5) {
+            //                pkmAudioFeatureNormalizer::normalizeDatabase(audio_database->featureDatabase);
             //            }
         }
         
-        currentSegment.resetCircularRowCounter();
-        currentSegmentFeatures.resetCircularRowCounter();
+        current_segment.resetCircularRowCounter();
+        current_segment_features.resetCircularRowCounter();
         
         bDrawNeedsUpdate = true;
     }
@@ -1474,7 +1561,20 @@ void app::processInputFrame()
 void app::audioIn(float * buf, int size,
                   int ch)
 {
-    
+    if(size < frame_size && size > 0)
+    {
+        cout << "[WARNING]!!! Frame size changed!!! Not sure how this shit will work now..." << endl;
+        cout << "frame_size: " << size << endl;
+        ring_buffer->setFrameSize(size);
+        spectral_flux->setFrameSize(size);
+        itunes_stream.setFrameSize(size);
+        
+        
+        current_segment = pkm::Mat(SAMPLE_RATE / frame_size * 5, size, true);
+        current_itunes_segment = pkm::Mat(SAMPLE_RATE / frame_size * 5, size, true);
+        
+        frame_size = size;
+    }
 //    vDSP_vclr(buf, 1, size*ch);
     
     if (animationCounter < animationtime || bInteractiveMode) {
@@ -1485,7 +1585,7 @@ void app::audioIn(float * buf, int size,
     if (!bOutOfMemory && bProcessingSong)
     {
 
-        if(!itunesStream.getNextBuffer(itunes_frame))
+        if(!itunes_stream.getNextBuffer(itunes_frame))
             bProcessingSong = false;
         
 //        for (int i = 0; i < size * ch; i++)
@@ -1493,24 +1593,27 @@ void app::audioIn(float * buf, int size,
 //            itunes_frame[i] = compressorInput.compressor(itunes_frame[i], 1.0, 1.0, 0.1, 0.4);
 //        }
 
-        ringBuffer->insertFrame(itunes_frame);
+        ring_buffer->insertFrame(itunes_frame);
 
-        if (ringBuffer->isRecorded())
+        if (ring_buffer->isRecorded())
         {
-            ringBuffer->copyAlignedData(alignedFrame);
+            ring_buffer->copyAlignedData(aligned_frame);
         
             // get audio features
-//            audioFeature->compute36DimAudioFeaturesF(alignedFrame, foreground_features);
-//            audioFeature->computeLFCCF(alignedFrame, foreground_features, numFeatures);
-            audioFeature->compute24DimAudioFeaturesF(alignedFrame, foreground_features);
-//            dct.dctII_1D(alignedFrame, foreground_features, numFeatures);
+//            audio_feature->compute36DimAudioFeaturesF(aligned_frame, foreground_features);
+//            audio_feature->computeLFCCF(aligned_frame, foreground_features, numFeatures);
+            audio_feature->compute24DimAudioFeaturesF(aligned_frame, foreground_features);
+//            dct.dctII_1D(aligned_frame, foreground_features, numFeatures);
             
             // check for onset
-            bDetectedOnset = spectralFlux->detectOnset(audioFeature->getMagnitudes(), audioFeature->getMagnitudesLength());
+            bDetectedOnset = spectral_flux->detectOnset(audio_feature->getMagnitudes(), audio_feature->getMagnitudesLength());
         }
         
         if(bDetectedOnset)
+        {
+//            audio_database->buildScreenMapping();
             segmentationCounter = 0;
+        }
         
         if (bLearning)
         {
@@ -1518,14 +1621,14 @@ void app::audioIn(float * buf, int size,
         }
         else
         {
-            currentITunesSegment.resetCircularRowCounter();
-            currentITunesSegmentFeatures.resetCircularRowCounter();
+            current_itunes_segment.resetCircularRowCounter();
+            current_itunes_segment_features.resetCircularRowCounter();
         }
         // ring buffer for current segment
-        currentITunesSegment.insertRowCircularly(itunes_frame);
+        current_itunes_segment.insertRowCircularly(itunes_frame);
         
         // ring buffer for audio features
-        currentITunesSegmentFeatures.insertRowCircularly(foreground_features);
+        current_itunes_segment_features.insertRowCircularly(foreground_features);
         //        }
     }
     else
@@ -1538,24 +1641,27 @@ void app::audioIn(float * buf, int size,
 //        }
 
         
-        ringBuffer->insertFrame(current_frame);
+        ring_buffer->insertFrame(current_frame);
 
-        if (ringBuffer->isRecorded())
+        if (ring_buffer->isRecorded())
         {
-            ringBuffer->copyAlignedData(alignedFrame);
+            ring_buffer->copyAlignedData(aligned_frame);
         
             // get audio features
-            //            audioFeature->compute36DimAudioFeaturesF(alignedFrame, foreground_features);
-            //audioFeature->computeLFCCF(alignedFrame, foreground_features, numFeatures);
-            audioFeature->compute24DimAudioFeaturesF(alignedFrame, foreground_features);
-//            dct.dctII_1D(alignedFrame, foreground_features, numFeatures);
+            //            audio_feature->compute36DimAudioFeaturesF(aligned_frame, foreground_features);
+            //audio_feature->computeLFCCF(aligned_frame, foreground_features, numFeatures);
+            audio_feature->compute24DimAudioFeaturesF(aligned_frame, foreground_features);
+//            dct.dctII_1D(aligned_frame, foreground_features, numFeatures);
             
             // check for onset
-            bDetectedOnset = spectralFlux->detectOnset(audioFeature->getMagnitudes(), audioFeature->getMagnitudesLength());
+            bDetectedOnset = spectral_flux->detectOnset(audio_feature->getMagnitudes(), audio_feature->getMagnitudesLength());
         }
         
         if(bDetectedOnset)
+        {
+//            audio_database->buildScreenMapping();
             segmentationCounter = 0;
+        }
         
         if (bLearning)
         {
@@ -1563,15 +1669,15 @@ void app::audioIn(float * buf, int size,
         }
         else
         {
-            currentSegment.resetCircularRowCounter();
-            currentSegmentFeatures.resetCircularRowCounter();
+            current_segment.resetCircularRowCounter();
+            current_segment_features.resetCircularRowCounter();
         }
         
         // ring buffer for current segment
-        currentSegment.insertRowCircularly(current_frame);
+        current_segment.insertRowCircularly(current_frame);
         
         // ring buffer for audio features
-        currentSegmentFeatures.insertRowCircularly(foreground_features);
+        current_segment_features.insertRowCircularly(foreground_features);
 
     }
 }
@@ -1591,13 +1697,13 @@ void app::touchDown(ofTouchEventArgs &touch)
     if(bDrawHelp)
         return;
     else if (bInteractiveMode) {
-        bTouching = true;
-        touchX = touch.x;
-        touchY = touch.y;
+        bTouching[touch.id] = true;
+        bUntouched[touch.id] = false;
+        touchX[touch.id] = touch.x;
+        touchY[touch.id] = touch.y;
         bDrawNeedsUpdate = true;
-        
     }
-    else {
+    else if (bDrawOptions){
         if(!bConvertingSong && !bWaitingForUserToPickSong && !bOutOfMemory)
         {
             if(touch.y > slider0_y-20 && touch.y < slider0_y+20)
@@ -1628,13 +1734,13 @@ void app::touchMoved(ofTouchEventArgs &touch){
         return;
     else if (bInteractiveMode) {
         
-        bTouching = true;
-        touchX = touch.x;
-        touchY = touch.y;
+        bTouching[touch.id] = true;
+        touchX[touch.id] = touch.x;
+        touchY[touch.id] = touch.y;
         bDrawNeedsUpdate = true;
         
     }
-    else {
+    else if (bDrawOptions){
         
         if(!bConvertingSong && !bWaitingForUserToPickSong && !bOutOfMemory)
         {
@@ -1650,8 +1756,8 @@ void app::touchMoved(ofTouchEventArgs &touch){
             else if(bMovingSlider1)
             {
                 slider1_position = MIN(1.0, MAX(0.0, (touch.x - slider1_x) / (float)slider_width));
-    //            spectralFlux->setOnsetThreshold((1.0f-slider1_position)*1.0f + 0.01f);
-    //            spectralFlux->setMinSegmentLength(MAX_GRAIN_LENGTH * sampleRate / (float)frameSize * (float)slider1_position);  // half second
+//            spectral_flux->setOnsetThreshold((1.0f-slider1_position)*1.0f + 0.01f);
+            spectral_flux->setMinSegmentLength(MAX_GRAIN_LENGTH * sampleRate / (float)frame_size * (float)slider1_position);  // half second
                 bDrawNeedsUpdate = true;
                 bMovingSlider0 = false;
                 bMovingSlider1 = true;
@@ -1660,7 +1766,7 @@ void app::touchMoved(ofTouchEventArgs &touch){
             else if(bMovingSlider2)
             {
                 slider2_position = MIN(1.0, MAX(0.0, (touch.x - slider2_x) / (float)slider_width));
-                audioDatabase->setK(round(slider2_position*maxVoices));
+                audio_database->setK(round(slider2_position*maxVoices));
                 bDrawNeedsUpdate = true;
                 bMovingSlider0 = false;
                 bMovingSlider1 = false;
@@ -1677,6 +1783,9 @@ void app::touchMoved(ofTouchEventArgs &touch){
 void app::touchUp(ofTouchEventArgs &touch)
 {
     
+    bTouching[touch.id] = false;
+    bUntouched[touch.id] = true;
+
    if( bDrawHelp )
    {
        bDrawNeedsUpdate = true;
@@ -1691,39 +1800,48 @@ void app::touchUp(ofTouchEventArgs &touch)
         bDrawHelp = 1;
         bDrawNeedsUpdate = true;
     }
-    else if (bInteractiveMode) {
+    else if (touch.x < 50 && touch.y < 50) {
+        bDrawOptions = !bDrawOptions;
+        bInteractiveMode = !bDrawOptions;
+        bSyncopated = false;
         
-        if (touch.x < 50 && touch.y < 50) {
-            bInteractiveMode = false;
-            bTouching = false;
-            bDrawNeedsUpdate = true;
-            bSyncopated = false;
-            return;
-        }
+        bDrawNeedsUpdate = true;
         
-        bTouching = false;
-        touchX = touch.x;
-        touchY = touch.y;
+        audio_database->buildScreenMapping();
+        
+        touchX[touch.id] = touch.x;
+        touchY[touch.id] = touch.y;
         
     }
-    else {
+//    else if(touch.x < 100 && touch.y < 50) {
+//        bInteractiveMode = !bInteractiveMode;
+//
+//        bTouching = bInteractiveMode;
+//        bSyncopated = bInteractiveMode;
+//        bDrawNeedsUpdate = true;
+//
+//        touchX = touch.x;
+//        touchY = touch.y;
+//        
+//    }
+    else if (bDrawOptions){
         if(!bConvertingSong && !bWaitingForUserToPickSong && !bOutOfMemory)
         {
-//            if (audioDatabase->getSize() > 32) {
-                if (touch.x < 50 && touch.y < 50) {
-                    audioDatabase->buildScreenMapping();
-                    bTouching = false;
-                    bInteractiveMode = true;
-                    bDrawNeedsUpdate = true;
-                    bSyncopated = true;
-                    return;
-                }
+//            if (audio_database->getSize() > 32) {
+//                if (touch.x < 50 && touch.y < 50) {
+//                    audio_database->buildScreenMapping();
+//                    bTouching = false;
+//                    bInteractiveMode = true;
+//                    bDrawNeedsUpdate = true;
+//                    bSyncopated = true;
+//                    return;
+//                }
 //            }
             
             //printf("Checking buttons\n");
             if (within<int>(touch.x, touch.y, button1_x, button1_y, button_width, button_height)) {
                 //printf("Button 1 pressed\n");
-                audioDatabase->resetDatabase();
+                audio_database->resetDatabase();
                 
                 bDrawNeedsUpdate = true;
                 currentFile = 0;
@@ -1737,7 +1855,7 @@ void app::touchUp(ofTouchEventArgs &touch)
                 }
                 else
                 {
-                    itunesStream.pickSong();
+                    itunes_stream.pickSong();
                     bWaitingForUserToPickSong = true;
                 }
             }
@@ -1746,8 +1864,8 @@ void app::touchUp(ofTouchEventArgs &touch)
                 bLearning = !bLearning;
                 
     //            if (!bLearning) {
-    //                audioDatabase->featureDatabase.print();
-    //                audioDatabase->buildScreenMapping();
+    //                audio_database->featureDatabase.print();
+    //                audio_database->buildScreenMapping();
     //            }
                 
                 bDrawNeedsUpdate = true;
@@ -1760,14 +1878,14 @@ void app::touchUp(ofTouchEventArgs &touch)
             else if(bMovingSlider1)
             {
                 slider1_position = MIN(1.0, MAX(0.0, (touch.x - slider1_x) / (float)slider_width));
-                //            spectralFlux->setOnsetThreshold((1.0f-slider1_position)*3.5f + 0.01f);
-    //            spectralFlux->setMinSegmentLength(sampleRate / (float)frameSize * (float)slider1_position);  // half second
+                //            spectral_flux->setOnsetThreshold((1.0f-slider1_position)*3.5f + 0.01f);
+    //            spectral_flux->setMinSegmentLength(sampleRate / (float)frame_size * (float)slider1_position);  // half second
                 bDrawNeedsUpdate = true;
             }
             else if(bMovingSlider2)
             {
                 slider2_position = MIN(1.0, MAX(0.0, (touch.x - slider2_x) / (float)slider_width));
-                audioDatabase->setK(round(slider2_position*maxVoices));
+                audio_database->setK(round(slider2_position*maxVoices));
                 bDrawNeedsUpdate = true;
             }
             //else if(within<int>(touch.x, touch.y, checkbox1_x, checkbox1_y, checkbox_size, checkbox_size))
@@ -1810,7 +1928,7 @@ void app::mousePressed(int x, int y, int button)
 		//printf("Checking buttons\n");
         if (within<int>(x, y, button1_x, button1_y, button_width, button_height)) {
             //printf("Button 1 pressed\n");
-            audioDatabase->resetDatabase();
+            audio_database->resetDatabase();
             bDrawNeedsUpdate = true;
             currentFile = 0;
         }
@@ -1838,14 +1956,14 @@ void app::mousePressed(int x, int y, int button)
 		{
 			slider1_position = (x - slider1_x) / (float)slider_width;
             bDrawNeedsUpdate = true;
-            //            spectralFlux->setOnsetThreshold((1.0f-slider1_position)*3.5f + 0.01f);
-//            spectralFlux->setMinSegmentLength(sampleRate / (float)frameSize * (float)slider1_position);  // half second
+            //            spectral_flux->setOnsetThreshold((1.0f-slider1_position)*3.5f + 0.01f);
+//            spectral_flux->setMinSegmentLength(sampleRate / (float)frame_size * (float)slider1_position);  // half second
 		}
 		else if(within<int>(x, y, slider2_x, slider2_y-20, slider_width, 40))
 		{
 			slider2_position = (x - slider2_x) / (float)slider_width;
             bDrawNeedsUpdate = true;
-			audioDatabase->setK(slider2_position*15);
+			audio_database->setK(slider2_position*15);
 		}
 		//else if(within<int>(x, y, checkbox1_x, checkbox1_y, checkbox_size, checkbox_size))
 		//{
@@ -1875,14 +1993,14 @@ void app::mouseDragged(int x, int y, int button){
         {
             slider1_position = (x - slider1_x) / (float)slider_width;
             bDrawNeedsUpdate = true;
-            //            spectralFlux->setOnsetThreshold((1.0f-slider1_position)*3.5f + 0.01f);
-//            spectralFlux->setMinSegmentLength(sampleRate / (float)frameSize * (float)slider1_position);  // half second
+            //            spectral_flux->setOnsetThreshold((1.0f-slider1_position)*3.5f + 0.01f);
+//            spectral_flux->setMinSegmentLength(sampleRate / (float)frame_size * (float)slider1_position);  // half second
         }
         else if(within<int>(x, y, slider2_x, slider2_y-20, slider_width, 40))
         {
             slider2_position = (x - slider2_x) / (float)slider_width;
             bDrawNeedsUpdate = true;
-            audioDatabase->setK(slider2_position*6.0f);
+            audio_database->setK(slider2_position*6.0f);
         }
     }
 	

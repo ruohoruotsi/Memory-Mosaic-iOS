@@ -86,7 +86,7 @@
 
 //#define DO_RECORD
 //#define DO_FILEINPUT
-//#define DO_REALTIME_FADING
+#define DO_REALTIME_FADING
 //#define DO_FILEBASED_SEGMENTS
 //#define DO_PLCA_SEPARATION
 
@@ -130,6 +130,7 @@
 #include <string>
 #include <vector>
 #include <map>
+
 using namespace std;
 
 class app : public ofxiOSApp{
@@ -151,8 +152,8 @@ public:
     void drawSliders        ();
 	void drawCheckboxes     ();
     
-    void drawInteractiveMode();
-    void drawPassiveListeningMode   ();
+    void drawInteractionScreen();
+    void drawOptions   ();
 	
     void loadSong			();
 	
@@ -166,7 +167,14 @@ public:
 	//void lostFocus        ();
 	//void gotFocus         ();
 	void gotMemoryWarning   ();
-	//void deviceOrientationChanged(int newOrientation);
+	void deviceOrientationChanged(int newOrientation)
+    {
+        if(ofxiOSGetGLView().frame.origin.x != 0
+           || ofxiOSGetGLView().frame.size.width != [[UIScreen mainScreen] bounds].size.width){
+            
+            ofxiOSGetGLView().frame = CGRectMake(0,0,[[UIScreen mainScreen] bounds].size.width,[[UIScreen mainScreen] bounds].size.height);
+        }
+    }
 #else
 	void mouseDragged       (int x, int y, int button);
 	void mousePressed       (int x, int y, int button);
@@ -181,8 +189,6 @@ public:
     string                          documentsDirectory;
     string                          targetFilename;
     
-	pkmEXTAudioFileReader           audioFileReader;
-	pkmEXTAudioFileWriter           audioFileWriter;
 #ifdef DO_RECORD
 	pkmEXTAudioFileWriter           audioOutputFileWriter;
 	pkmEXTAudioFileWriter           audioInputFileWriter;
@@ -192,17 +198,16 @@ public:
 	pkmEXTAudioFileReader           inputAudioFileReader;
     long                            inputAudioFileFrame;
 #endif
-    pkmCircularRecorder             *ringBuffer;
-    float                           *alignedFrame;
+    pkmCircularRecorder             *ring_buffer;
+    float                           *aligned_frame;
     float                           *zeroFrame;
     int                             fftSize;
     
-    int                             currentSampleNumber, frameSize, hopSize, frame, sampleRate, output_frame;
+    int                             currentSampleNumber, frame_size, hopSize, frame, sampleRate, output_frame;
 	float                           *current_frame, *itunes_frame, *buffer, *output_mono, *output;
     
-    float                           touchX, touchY;
 	
-    ofFbo                           myFBO;
+    ofFbo                           fbo, fbo2, fbo3;
     ofImage                         background;
     ofImage                         button;
     
@@ -211,30 +216,25 @@ public:
 	vector<ofFile>                  audioFiles;
     map<string, int>                audioLUT;
 	
-    ofTrueTypeFont                  largeBoldFont;
-    ofTrueTypeFont                  largeThinFont;
-    ofTrueTypeFont                  smallBoldFont;
-    ofTrueTypeFont                  smallThinFont;
-    ofTrueTypeFont                  infoFont;
-    
-    pkm::Mat                        audioOutput;
+    ofTrueTypeFont                  large_bold_font;
+    ofTrueTypeFont                  small_bold_font;
+    ofTrueTypeFont                  info_font;
     
     float                           *foreground_features;
-    pkm::Mat                        featureFrame;
     int                             numFeatures;
 	int								animationCounter, segmentationCounter;
     FILE *fp;
-	pkmAudioSegmentDatabase         *audioDatabase;
-    int                             currentNumFeatures; // size of database
-    pkmAudioSpectralFlux            *spectralFlux;
-    pkmAudioSegment                 *audioSegment;
-	pkmAudioFeatures                *audioFeature;
+	pkmAudioSegmentDatabase         *audio_database;
+    int                             current_num_features; // size of database
+    pkmAudioSpectralFlux            *spectral_flux;
+    pkmAudioSegment                 *audio_segment;
+	pkmAudioFeatures                *audio_feature;
     pkmDCT                          dct;
-    vector<ofPtr<pkmAudioSegment> > nearestAudioSegments;
-    pkmAudioFeatureNormalizer       *audioDatabaseNormalizer;
+    pkmAudioFeatureNormalizer       *audio_database_normalizer;
+    vector<ofPtr<pkmAudioSegment> > nearest_audio_segments;
     
-    pkm::Mat                        currentSegment, currentITunesSegment;
-    pkm::Mat                        currentSegmentFeatures, currentSegmentCroppedFeature, currentITunesSegmentFeatures;
+    pkm::Mat                        current_segment, current_itunes_segment;
+    pkm::Mat                        current_segment_features, current_itunes_segment_features;
     
 #ifdef DO_PLCA_SEPARATION
     pkmPLCA                         *plca;
@@ -244,50 +244,43 @@ public:
     int                             backgroundIterations;
 #endif
     
-    int                             inputSegmentsCounter;
-    
-    int                             itunesFrame;
-    
-    maxiChorus                      lChorus,rChorus;
-    maxiFilter                      loresFilter;
-    maxiDyn                         compressor, compressorInput;
-    maxiDelayline                   delayline;
-    maxiDelayline                   leftDelay1,leftDelay2,rightDelay1,rightDelay2;
-    maxiEnvelopeFollowerF           inputFollower;
-    
-    Limiter                         limit;
+    maxiDyn                         compressor;
 	
     pkmEXTAudioFileReader           songReader;
 #ifdef TARGET_OF_IPHONE
-    ofxiTunesLibraryStream          itunesStream;
+    ofxiTunesLibraryStream          itunes_stream;
 #endif
     
-    ofImage                         buttonScreenSliders, buttonScreenInteraction, buttonInfo;
+    ofImage                         buttonMenuSliders, buttonScreenInteraction, buttonInfo;
     
     bool                            bWaitingForUserToPickSong,
-    bConvertingSong,
-    bLoadedSong,
-    bProcessingSong;
+                                    bConvertingSong,
+                                    bLoadedSong,
+                                    bProcessingSong;
     
     bool                            bMovingSlider0, bMovingSlider1, bMovingSlider2;
     
 	bool                            bSetup,
-    bPressed,
-    bOutOfMemory,
-    bLearning,
-    bSyncopated,
-    bCopiedBackground,
-    bMatching,
-    bVocoder,
-    bRealTime,
-    bSemaphore,
-    bLearnedPLCABackground,
-    bLearningInputForNormalization,
-    bDrawNeedsUpdate,
-    bDetectedOnset,
-    bInteractiveMode, bTouching;
+                                    bPressed,
+                                    bOutOfMemory,
+                                    bLearning,
+                                    bSyncopated,
+                                    bCopiedBackground,
+                                    bMatching,
+                                    bVocoder,
+                                    bRealTime,
+                                    bSemaphore,
+                                    bLearnedPLCABackground,
+                                    bLearningInputForNormalization,
+                                    bDrawNeedsUpdate,
+                                    bDetectedOnset,
+                                    bInteractiveMode,
+                                    bDrawOptions;
     
-    int bDrawHelp;
+    map<int, bool>                  bTouching, bUntouched;
+    map<int, float>                 touchX, touchY;
+    
+    int                             bDrawHelp;
     
 };
 
